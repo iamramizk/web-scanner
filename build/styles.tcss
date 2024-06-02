@@ -1,0 +1,18 @@
+.panel {
+  scrollbar-size: 0 0;
+}
+
+Header {
+}
+
+Footer {
+}
+
+Container {
+    text-align: center;
+}
+
+Static {
+
+}
+

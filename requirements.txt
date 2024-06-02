@@ -1,0 +1,6 @@
+textual
+pydig
+beautifulsoup4
+textual==0.61.0
+rich
+python-Wappalyzer
