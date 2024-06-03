@@ -11,7 +11,7 @@ from rich import box
 from rich.prompt import Confirm
 from rich.panel import Panel
 from rich.console import Console
-from build.scanner import Scanner
+from utils.scanner import Scanner
 
 console = Console()
 
@@ -154,7 +154,7 @@ class SocialsScreen(Screen):
 
 
 class WebScanner(App):
-    CSS_PATH = "build/styles.tcss"
+    CSS_PATH = "utils/styles.tcss"
 
     BINDINGS = [
         ("q", "quit", "Quit"),
