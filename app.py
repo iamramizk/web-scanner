@@ -11,7 +11,7 @@ from rich import box
 from rich.prompt import Confirm
 from rich.panel import Panel
 from rich.console import Console
-from utils.scanner import Scanner
+from utils import Scanner, Helpers
 
 console = Console()
 
@@ -189,13 +189,6 @@ def get_modified_time(file_path: str) -> str:
     return last_modified_str
 
 
-def clean_url(url: str) -> str:
-    """Cleans the URL to the basic form"""
-    if "//" in url:
-        return url.split("//")[1].strip()
-    return url.strip()
-
-
 if __name__ == "__main__":
     args = sys.argv
     if not len(args) > 1:
@@ -204,8 +197,14 @@ if __name__ == "__main__":
         )
         exit()
 
-    target = str(args[1])
-    target = clean_url(target)
+    target = str(args[1]).strip()
+    if Helpers.is_valid_url(target):
+        target = Helpers.get_short_url(target)
+    else:
+        console.print(
+            "\n[bold red][!][/bold red] Must provide a valid target URL.",
+        )
+        exit()
 
     # check if file exists
     if os.path.isfile(f"data/{target}.json"):
