@@ -11,7 +11,7 @@ from rich import box
 from rich.prompt import Confirm
 from rich.panel import Panel
 from rich.console import Console
-from utils import Scanner, Helpers
+from utils import Scanner, Helper
 
 console = Console()
 
@@ -198,8 +198,8 @@ if __name__ == "__main__":
         exit()
 
     target = str(args[1]).strip()
-    if Helpers.is_valid_url(target):
-        target = Helpers.get_short_url(target)
+    if Helper.is_valid_url(target):
+        target = Helper.get_short_url(target)
     else:
         console.print(
             "\n[bold red][!][/bold red] Must provide a valid target URL.",

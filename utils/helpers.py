@@ -2,7 +2,7 @@ import re
 from urllib.parse import urlparse
 
 
-class Helpers:
+class Helper:
     @staticmethod
     def is_valid_url(url: str) -> bool:
         """Checks if a string is a valid URL"""
