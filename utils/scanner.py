@@ -16,8 +16,9 @@ from rich.progress import (
     BarColumn,
     SpinnerColumn,
 )
+from .nameserver import NsLookup
+from .helpers import Helper
 
-# from socials import social_media_domains
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -169,8 +170,13 @@ class Scanner:
         os.system(f"rm {file_path}")
 
     def get_host(self) -> None:
-        results = requests.get(f"http://ip-api.com/json/{self.url}")
-        self.host = results.json()
+        results = requests.get(f"http://ip-api.com/json/{self.url}").json()
+        # Append nameserver to host dict
+        if results["as"]:
+            ns = NsLookup.get_name_by_as_string(results["as"])
+            if ns:
+                results["ns"] = ns
+        self.host = results
 
     def get_tech(self) -> None:
         wappalyzer = Wappalyzer.latest()
