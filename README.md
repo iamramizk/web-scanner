@@ -1,6 +1,6 @@
 # WebScanner
 
-WebScanner is a Python TUI (Text-based User Interface) application that provides comprehensive information about a website. It utilises various techniques to gather data, including DNS lookups, WHOIS scans, server host lookups, and more – all in one place, and wihtout the need for external APIs.
+WebScanner is a Python TUI (Text-based User Interface) application that provides comprehensive information about a website. It utilises various techniques to gather data, including DNS lookups, WHOIS scans, server host lookups, and more – all in one place, and without the need for external APIs.
 
 ## Features
 
