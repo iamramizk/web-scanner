@@ -44,4 +44,5 @@ Run the application:
 
 ## Screenshots
 
-![Screenshot 1](utils/.screenshots/screenshot1.png)
+![Screenshot 1](.docs/screenshot1.jpg)
+![Screenshot 1](.docs/screenshot2.jpg)
