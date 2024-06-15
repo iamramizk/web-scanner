@@ -19,8 +19,9 @@ console = Console()
 def get_header_panel(text: str):
     return Panel(
         str(text),
-        style="bold",
-        border_style="cyan",
+        style="bold on black",
+        # border_style="cyan",
+        box=box.SIMPLE,
     )
 
 
