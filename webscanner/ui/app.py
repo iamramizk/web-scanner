@@ -165,7 +165,7 @@ class WebScannerApp(App):
         if event.name == self.selected:
             self._refresh_main()
         if event.name == "tech" and self.ctx is not None and event.result is not None:
-            self.query_one("#status-content", StatusPanel).set_ctx(self.ctx, event.result.data)
+            self.query_one("#status-content", StatusPanel).set_ctx(self.ctx, event.result.data.names)
         self._update_progress()
 
     def on_scan_finished(self, message: ScanFinished) -> None:

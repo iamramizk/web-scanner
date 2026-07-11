@@ -11,7 +11,7 @@ from rich.text import Text
 
 from ..colors import RED
 from ..core.context import ScanContext
-from ..core.models import Sections
+from ..core.models import Grid, Sections
 
 # Neutral, non-cyan key styling + a muted header + a very dim divider rule.
 KEY_STYLE = "bold"
@@ -29,7 +29,6 @@ TAB_HEADERS: dict[str, tuple[str, str]] = {
     "subdomains": ("#", "Subdomain"),
     "ssl": ("Field", "Value"),
     "headers": ("Header", "Value"),
-    "tech": ("#", "Technology"),
     "content": ("Field", "Value"),
 }
 
@@ -39,10 +38,42 @@ MAX_KEY_WIDTH = 34
 
 
 def render_result(name: str, data: Any) -> RenderableType:
-    """Render a module's result: stacked sub-tables (Sections) or one table."""
+    """Render a module's result: multi-column Grid, stacked sub-tables (Sections),
+    or one key/value table."""
+    if isinstance(data, Grid):
+        return render_grid(data)
     if isinstance(data, Sections):
         return render_sections(data)
     return render_table(data, TAB_HEADERS.get(name))
+
+
+def render_grid(grid: Grid) -> Table:
+    """Render a multi-column table (e.g. Tech: Name/Category/Confidence/…).
+
+    First column is the primary name (bold); the rest are dim, matching the
+    key/value tables. Long list columns fold rather than truncate.
+    """
+    table = Table(
+        show_header=True,
+        header_style=HEADER_STYLE,
+        border_style=DIVIDER_STYLE,
+        box=box.SIMPLE,
+        expand=True,
+        pad_edge=False,
+        show_lines=False,
+        padding=(0, 1),
+    )
+    for i, col in enumerate(grid.columns):
+        if i == 0:
+            table.add_column(col, style=KEY_STYLE, no_wrap=True, overflow="ellipsis")
+        else:
+            table.add_column(col, style="dim", no_wrap=False, overflow="fold")
+    rows = [[str(cell) for cell in row] for row in grid]
+    for i, row in enumerate(rows):
+        table.add_row(*row)
+        if i != len(rows) - 1:
+            table.add_row(*[""] * len(grid.columns))  # blank spacer line
+    return table
 
 
 def render_sections(sections: Sections) -> Group:

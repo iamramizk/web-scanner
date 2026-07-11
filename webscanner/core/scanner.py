@@ -6,7 +6,7 @@ Flow:
   2. run()       — run every module concurrently, each failure-isolated, emitting
      ScanEvents so the UI can animate progress and colour tabs live.
 
-Blocking libraries (pydig, requests, techfinder, system whois) are offloaded to
+Blocking libraries (pydig, requests, wappalyzer, system whois) are offloaded to
 threads via ``asyncio.to_thread`` so the event loop never stalls.
 """
 

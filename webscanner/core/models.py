@@ -60,3 +60,20 @@ class Sections(list):
     A ``list`` of :class:`Section`. Used by modules (e.g. Security) that show more
     than one table under a single tab.
     """
+
+
+class Grid(list):
+    """A multi-column table result: rows (list of value-lists) + column headers.
+
+    A ``list`` of rows, so an empty ``Grid`` reports EMPTY via ``_is_empty``. The
+    first column is treated as each row's primary name.
+    """
+
+    def __init__(self, columns: list[str], rows: Any) -> None:
+        super().__init__(rows)
+        self.columns = list(columns)
+
+    @property
+    def names(self) -> list[str]:
+        """First-column values (e.g. tech names for the Server-panel summary)."""
+        return [row[0] for row in self]
