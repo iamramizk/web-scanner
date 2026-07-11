@@ -2,7 +2,7 @@ __pycache__/
 .DS_Store
 **/.DS_Store
 .venv*
-data/*.json
+output/
 .claude/
 .agents/
 **/claude.md

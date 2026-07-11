@@ -21,6 +21,7 @@ from textual.widgets import Input, Static
 from ..core import AsyncScanner, ModuleStatus, ScanContext, ScanEvent
 from ..core.scanner import PREFETCH
 from ..modules import all_modules
+from .export import export_csvs
 from .tables import render_result
 from .widgets import MapPanel, StatusPanel, TabBar, Tab
 
@@ -58,6 +59,7 @@ class WebScannerApp(App):
         Binding("tab", "next_tab", show=False, priority=True),
         Binding("shift+tab", "prev_tab", show=False, priority=True),
         Binding("r", "rescan", "Rescan", show=False),
+        Binding("s", "save", "Save", show=False),
         Binding("escape", "toggle_edit", "Edit domain", show=False),
         Binding("plus,equals_sign", "zoom_in", "Zoom map in", show=False),
         Binding("minus,underscore", "zoom_out", "Zoom map out", show=False),
@@ -242,6 +244,15 @@ class WebScannerApp(App):
         if self.ctx is not None:
             self.start_scan(self.ctx.domain)
 
+    def action_save(self) -> None:
+        """Save every completed tab to CSV under output/<domain>_<timestamp>/."""
+        if self.ctx is None or not self.results:
+            self.query_one("#progress", Static).update("[dim]nothing to save yet[/]")
+            return
+        folder = export_csvs(self.ctx.domain, self.modules, self.results)
+        msg = f"[dim]saved → {folder}[/]" if folder else "[dim]nothing to save yet[/]"
+        self.query_one("#progress", Static).update(msg)
+
     def action_toggle_edit(self) -> None:
         """Esc toggles domain editing (and the keybar) without moving other focus."""
         editing = self.focused is not None and self.focused.id == "domain"
@@ -271,6 +282,6 @@ class WebScannerApp(App):
         if editing:
             pairs = [("enter", "Scan"), ("esc", "Cancel")]
         else:
-            pairs = [("q", "Quit"), ("←/→", "Tab"), ("r", "Rescan"), ("esc", "Edit domain")]
+            pairs = [("q", "Quit"), ("←/→", "Tab"), ("r", "Rescan"), ("s", "Save"), ("esc", "Edit domain")]
         text = "   ".join(f"[b {c}]{k}[/] {label}" for k, label in pairs)
         self.query_one("#keybar", Static).update(text)
