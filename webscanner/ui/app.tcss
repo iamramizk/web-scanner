@@ -1,0 +1,84 @@
+Screen {
+    background: $background;
+}
+
+/* ---- top bar: domain input + tab row ---- */
+#topbar {
+    height: auto;
+    border: round $primary;
+    padding: 1 1;   /* gap above input + below tabs, off the border */
+}
+
+#domain {
+    border: none;
+    height: 1;
+    padding: 0;
+    background: transparent;
+}
+
+#tabs {
+    height: 1;
+    margin-top: 1;
+}
+
+/* Tabs stay dim regardless of scan status; only the selected tab is highlighted. */
+Tab {
+    width: auto;
+    height: 1;
+    padding: 0 1;
+    margin-right: 1;
+    color: $text-muted;
+}
+Tab.-selected {
+    background: $primary;
+    color: $text;
+    text-style: bold;
+}
+
+/* ---- bottom progress line (always dim) ---- */
+#progress {
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+}
+
+/* ---- bottom keybar (blends into the TUI bg) ---- */
+#keybar {
+    height: 1;
+    padding: 0 1;
+    background: $background;
+    color: $text-muted;
+}
+
+/* ---- main grid ---- */
+#grid {
+    layout: grid;
+    grid-size: 2 2;
+    grid-columns: 2fr 1fr;
+    grid-rows: 1fr 1fr;
+    grid-gutter: 0;
+    height: 1fr;   /* fill remaining screen so 1fr rows split equally */
+}
+
+#main {
+    row-span: 2;
+    height: 100%;
+    border: round $primary;
+    padding: 0 1;
+    scrollbar-size: 0 0;   /* keep wheel/key scroll, hide the bar */
+}
+
+#map {
+    height: 100%;
+    border: round $primary;
+    padding: 0 1;
+    color: $success;
+    scrollbar-size: 0 0;
+}
+
+#status {
+    height: 100%;
+    border: round $primary;
+    padding: 1 1 0 2;   /* space above the table and to the left */
+    scrollbar-size: 0 0;   /* keep the bar hidden even if content overflows */
+}
