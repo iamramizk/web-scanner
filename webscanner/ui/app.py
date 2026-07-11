@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Grid, Vertical, VerticalScroll
+from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.widgets import Input, Static
 
@@ -85,14 +85,16 @@ class WebScannerApp(App):
             with VerticalScroll(id="main"):
                 yield Static("", id="main-content")
             yield MapPanel(id="map")
-            yield StatusPanel(id="status")
-        yield Static("", id="progress")
-        yield Static("", id="keybar")
+            with VerticalScroll(id="status"):
+                yield StatusPanel(id="status-content")
+        with Horizontal(id="footer"):
+            yield Static("", id="keybar")
+            yield Static("", id="progress")
 
     def on_mount(self) -> None:
         self.query_one("#topbar").border_title = "🌐 WebScanner"
         self.query_one("#map").border_title = "server location"
-        self.query_one("#status").border_title = "Server"
+        self.query_one("#status", VerticalScroll).border_title = "Server"
         self._spinner_timer = self.set_interval(0.08, self._tick, pause=True)
         self.query_one("#tabs", TabBar).set_selected(self.selected)
         self._update_main_title()
@@ -116,9 +118,9 @@ class WebScannerApp(App):
         for module in self.modules:
             tabs.set_status(module.name, ModuleStatus.PENDING)
 
-        self.query_one("#main-content", Static).update("[dim]scanning…[/]")
+        self._set_main("[dim]scanning…[/]")
         self.query_one("#map", MapPanel).show_loading()
-        self.query_one("#status", StatusPanel).show_loading(self.ctx)
+        self.query_one("#status-content", StatusPanel).show_loading(self.ctx)
         self._spinner_timer.resume()
 
         # Blur the input so single-key nav (←/→, q, r) reaches the app rather
@@ -146,7 +148,7 @@ class WebScannerApp(App):
         if event.name == PREFETCH:
             if event.status is ModuleStatus.DONE and self.ctx is not None:
                 self.query_one("#map", MapPanel).set_geo(self.ctx.geo)
-                self.query_one("#status", StatusPanel).set_ctx(self.ctx)
+                self.query_one("#status-content", StatusPanel).set_ctx(self.ctx)
             return
 
         self.query_one("#tabs", TabBar).set_status(event.name, event.status)
@@ -163,23 +165,16 @@ class WebScannerApp(App):
         if event.name == self.selected:
             self._refresh_main()
         if event.name == "tech" and self.ctx is not None and event.result is not None:
-            self.query_one("#status", StatusPanel).set_ctx(self.ctx, event.result.data)
+            self.query_one("#status-content", StatusPanel).set_ctx(self.ctx, event.result.data)
         self._update_progress()
 
     def on_scan_finished(self, message: ScanFinished) -> None:
         self._scanning = False
         self._spinner_timer.pause()
         total = len(self.modules)
-        self.query_one("#progress", Static).update(
-            f"done · {total}/{total} · {self._errs()}"
-        )
+        self.query_one("#progress", Static).update(f"done · {total}/{total}")
 
     # ---- progress line ----------------------------------------------------
-
-    def _errs(self) -> str:
-        if self.failed == 0:
-            return "no errors"
-        return "1 error" if self.failed == 1 else f"{self.failed} errors"
 
     def _tick(self) -> None:
         self._frame = (self._frame + 1) % len(_SPINNER)
@@ -190,7 +185,7 @@ class WebScannerApp(App):
             return
         frame = _SPINNER[self._frame]
         self.query_one("#progress", Static).update(
-            f"{frame} scanning… {self.completed}/{len(self.modules)} · {self._errs()}"
+            f"{frame} scanning… {self.completed}/{len(self.modules)}"
         )
 
     # ---- tab selection ----------------------------------------------------
@@ -207,18 +202,22 @@ class WebScannerApp(App):
         label = next(m.label for m in self.modules if m.name == self.selected)
         self.query_one("#main").border_title = label
 
+    def _set_main(self, markup: str) -> None:
+        # Leading blank line + space so placeholders sit clear of the border,
+        # matching where real section content begins.
+        self.query_one("#main-content", Static).update(f"\n {markup}")
+
     def _refresh_main(self) -> None:
         self._update_main_title()
-        content = self.query_one("#main-content", Static)
         result = self.results.get(self.selected)
         if result is None:
-            content.update("[dim]scanning…[/]")
+            self._set_main("[dim]scanning…[/]")
         elif result.status is ModuleStatus.FAILED:
-            content.update(f"[red]failed:[/] {result.error}")
+            self._set_main(f"[red]failed:[/] {result.error}")
         elif result.status is ModuleStatus.EMPTY:
-            content.update("[dim]no data found[/]")
+            self._set_main("[dim]no data found[/]")
         else:
-            content.update(render_result(self.selected, result.data))
+            self.query_one("#main-content", Static).update(render_result(self.selected, result.data))
 
     def on_tab_clicked(self, message: Tab.Clicked) -> None:
         self._select(message.tab_name)

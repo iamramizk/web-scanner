@@ -35,19 +35,28 @@ Tab.-selected {
     text-style: bold;
 }
 
-/* ---- bottom progress line (always dim) ---- */
-#progress {
+/* ---- bottom footer row: keybar (left) + progress (right) ---- */
+#footer {
     height: 1;
-    padding: 0 1;
-    color: $text-muted;
+    background: $background;
 }
 
-/* ---- bottom keybar (blends into the TUI bg) ---- */
+/* ---- keybar (blends into the TUI bg) ---- */
 #keybar {
+    width: 1fr;
     height: 1;
     padding: 0 1;
     background: $background;
     color: $text-muted;
+}
+
+/* ---- progress indicator, right-aligned on the footer row (always dim) ---- */
+#progress {
+    width: auto;
+    height: 1;
+    padding: 0 1;
+    color: $text-muted;
+    text-align: right;
 }
 
 /* ---- main grid ---- */
