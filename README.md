@@ -49,10 +49,13 @@ The easiest way is with [pipx](https://pipx.pypa.io/) (or [uv](https://docs.astr
 which installs `webscan` into its own isolated environment:
 
 ```bash
-pipx install git+https://github.com/iamramizk/web-scanner
+pipx install web-scanner
 # or
-uv tool install git+https://github.com/iamramizk/web-scanner
+uv tool install web-scanner
 ```
+
+To install the latest unreleased code, point either tool at the repo instead:
+`pipx install git+https://github.com/iamramizk/web-scanner`.
 
 ### From source (development)
 
@@ -78,14 +81,12 @@ Press `s` inside the app to save every tab to CSV. When installed, results are w
 
 ## Updating
 
-Once it's on PyPI:
-
 ```bash
 pipx upgrade web-scanner
 ```
 
-For a Git install, `pipx upgrade` won't see new commits (the version is unchanged), so
-reinstall from the source:
+If you installed from Git, `pipx upgrade` won't see new commits (the version is unchanged),
+so reinstall from source instead:
 
 ```bash
 pipx install --force git+https://github.com/iamramizk/web-scanner
