@@ -1,17 +1,45 @@
 # WebScanner
 
-WebScanner is a Python TUI (Text-based User Interface) application that provides comprehensive information about a website. It utilises various techniques to gather data, including DNS lookups, WHOIS scans, server host lookups, and more – all in one place, and without the need for external APIs.
+An async [Textual](https://textual.textualize.io/) TUI for website reconnaissance. Point it
+at a domain and it concurrently gathers DNS, WHOIS, TLS, security, tech-stack and SEO
+intelligence, then lays it out across tabs — with a live country map and a server-status
+panel that stay pinned in place.
+
+**No paid APIs.** Everything runs off free, public endpoints and the standard library:
+`ip-api.com` for geolocation, Cloudflare/Google DoH and `dig` against public filtering
+resolvers for blocklist checks, the system `whois`, and stdlib `ssl`/`socket`. Country
+borders are embedded (Natural Earth), so even the map needs no tile service.
+
+![WebScanner](.github/screenshot-v2.png)
 
 ## Features
 
-- **DNS Lookup:** Perform a dig lookup for all DNS records, including AAAA, MX, etc.
-- **WHOIS Scan:** Retrieve WHOIS information for the website.
-- **Server Host Lookup:** Show IP address, location, and host provider information.
-- **Tech Stack Identification:** Identify the technology stack used on the website, including languages, libraries, web servers, CMS, etc.
-- **Header Grabbing:** Get the headers for the site.
-- **Script URLs Listing:** List all the URLs of scripts used on the website.
-- **Meta Information:** Show meta information such as title, description, and all headings on the page.
-- **Social Media Links:** List all the social media links found on the page.
+Nine tabs, scanned concurrently and rendered live as each module finishes:
+
+- **DNS** — A / AAAA / NS / CNAME / SOA / MX / TXT / CAA / DS / DNSKEY records, plus email
+  authentication folded in: DMARC (`_dmarc`) and DKIM (probes ~40 common selectors).
+- **Whois** — parsed system `whois`, with rich gTLD and ccTLD field support (registrar,
+  dates, nameservers, per-contact details).
+- **Subdomains** — discovered natively from TLS certificate SANs and `socket` probes of
+  common subdomains — no third-party enumeration services.
+- **SSL** — certificate issuer, subject, SANs, validity window, trust and expiry, parsed
+  from the live TLS handshake.
+- **Security** — TCP connect port scan, presence of HTTP security headers (CSP, HSTS,
+  X-Frame-Options, …), and blocklist status across public filtering resolvers
+  (AdGuard, CleanBrowsing, Cloudflare, Google, OpenDNS, Quad9).
+- **Headers** — the full set of HTTP response headers.
+- **Tech** — technology-stack detection via [Wappalyzer](https://github.com/tunetheweb/wappalyzer):
+  name, category, confidence, groups and version.
+- **SEO** — page content (title/description with length hints, H1–H3, social links), top
+  keyword n-grams, `robots.txt` and sitemaps, and JSON-LD structured data.
+- **Links** — internal and external links, with their anchor text.
+
+Alongside the tabs, two fixed panels:
+
+- **Country map** — real country outlines auto-framed around the server's location, drawn
+  with braille characters (`+` / `-` to zoom).
+- **Server** — online status and response time, IP, geolocation, ISP, AS, hosting provider
+  and detected tech.
 
 ## Installation
 
@@ -19,14 +47,15 @@ WebScanner is a Python TUI (Text-based User Interface) application that provides
 
    ```bash
    git clone https://github.com/iamramizk/web-scanner.git
+   cd web-scanner
    ```
 
-2. Create a new virtual environment and activate it:
+2. Create and activate a virtual environment:
 
    ```bash
    python3 -m venv .venv
-   source .venv/bin/activate   # for Unix/macOS
-   .venv\Scripts\activate      # for Windows
+   source .venv/bin/activate    # Unix/macOS
+   .venv\Scripts\activate       # Windows
    ```
 
 3. Install dependencies:
@@ -36,13 +65,17 @@ WebScanner is a Python TUI (Text-based User Interface) application that provides
    ```
 
 ## Usage
-Run the application:
 
-   ```bash
-   python3 app.py example.com
-   ```
+```bash
+python app.py example.com
+```
 
-## Screenshots
+### Keys
 
-![Screenshot 1](.docs/screenshot1.jpg)
-![Screenshot 1](.docs/screenshot2.jpg)
+| Key             | Action                                                              |
+| --------------- | ------------------------------------------------------------------- |
+| `←` / `→` `Tab` | Switch tabs                                                         |
+| `r`             | Rescan                                                              |
+| `s`             | Save — export every tab to CSV under `output/<domain>_<timestamp>/` |
+| `esc`           | Edit the domain and scan a new one                                  |
+| `q`             | Quit                                                                |
