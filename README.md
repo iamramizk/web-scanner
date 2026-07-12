@@ -43,31 +43,52 @@ Alongside the tabs, two fixed panels:
 
 ## Installation
 
-1. Clone the repository:
+Requires Python 3.11+.
 
-   ```bash
-   git clone https://github.com/iamramizk/web-scanner.git
-   cd web-scanner
-   ```
+The easiest way is with [pipx](https://pipx.pypa.io/) (or [uv](https://docs.astral.sh/uv/)),
+which installs `webscan` into its own isolated environment:
 
-2. Create and activate a virtual environment:
+```bash
+pipx install git+https://github.com/iamramizk/web-scanner
+# or
+uv tool install git+https://github.com/iamramizk/web-scanner
+```
 
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate    # Unix/macOS
-   .venv\Scripts\activate       # Windows
-   ```
+### From source (development)
 
-3. Install dependencies:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+git clone https://github.com/iamramizk/web-scanner.git
+cd web-scanner
+python3 -m venv .venv
+source .venv/bin/activate     # Unix/macOS  (.venv\Scripts\activate on Windows)
+pip install -e .
+```
 
 ## Usage
 
 ```bash
-python app.py example.com
+webscan example.com
+```
+
+You can also run it as a module (`python -m webscanner example.com`), or from a source
+checkout without installing (`python app.py example.com`).
+
+Press `s` inside the app to save every tab to CSV. When installed, results are written to
+`./output/<domain>_<timestamp>/` in your current directory.
+
+## Updating
+
+Once it's on PyPI:
+
+```bash
+pipx upgrade web-scanner
+```
+
+For a Git install, `pipx upgrade` won't see new commits (the version is unchanged), so
+reinstall from the source:
+
+```bash
+pipx install --force git+https://github.com/iamramizk/web-scanner
 ```
 
 ### Keys

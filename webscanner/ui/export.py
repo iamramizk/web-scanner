@@ -18,7 +18,18 @@ from rich.text import Text
 from ..core.models import Grid, ModuleStatus, Sections
 from .tables import TAB_HEADERS
 
-OUTPUT_DIR = Path("output")
+def _output_base() -> Path:
+    """Where to write ``<domain>_<ts>/`` folders.
+
+    Running from the source checkout (or an editable ``pip install -e .``) keeps the
+    repo's gitignored ``output/`` folder — the package sits next to ``pyproject.toml``.
+    Installed elsewhere (e.g. via pipx/uv) there is no such marker, so results go to
+    the user's current working directory instead of some hidden site-packages path.
+    """
+    repo_root = Path(__file__).resolve().parents[2]  # webscanner/ui/export.py -> repo root
+    if (repo_root / "pyproject.toml").is_file():
+        return repo_root / "output"
+    return Path.cwd() / "output"
 
 
 def _stringify(value: Any) -> str:
@@ -94,7 +105,7 @@ def export_csvs(domain: str, modules: list, results: dict) -> Path | None:
     if not tabs:
         return None
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    folder = OUTPUT_DIR / f"{domain}_{ts}"
+    folder = _output_base() / f"{domain}_{ts}"
     folder.mkdir(parents=True, exist_ok=True)
     for module in tabs:
         _write_tab(folder / f"{module.name}.csv", module.name, results[module.name].data)
