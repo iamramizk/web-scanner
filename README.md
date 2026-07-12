@@ -73,8 +73,8 @@ webscan example.com
 You can also run it as a module (`python -m webscanner example.com`), or from a source
 checkout without installing (`python app.py example.com`).
 
-Press `s` inside the app to save every tab to CSV. When installed, results are written to
-`./output/<domain>_<timestamp>/` in your current directory.
+Press `s` inside the app to save every tab to CSV. When installed, results are written to a
+`./<domain>_<timestamp>/` folder in your current directory.
 
 ## Updating
 
