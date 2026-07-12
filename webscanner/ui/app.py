@@ -250,7 +250,16 @@ class WebScannerApp(App):
             self.query_one("#progress", Static).update("[dim]nothing to save yet[/]")
             return
         folder = export_csvs(self.ctx.domain, self.modules, self.results)
-        msg = f"[dim]saved → {folder}[/]" if folder else "[dim]nothing to save yet[/]"
+        if folder:
+            base = folder.parent  # where it saved, minus the domain_<ts> folder name
+            names = [p for p in base.parts if p != base.anchor]  # drop the '/' root
+            tail = names[-2:]
+            shown = "/".join(tail) if tail else str(base)
+            if len(names) > len(tail):
+                shown = "…/" + shown
+            msg = f"[dim]saved → {shown}[/]"
+        else:
+            msg = "[dim]nothing to save yet[/]"
         self.query_one("#progress", Static).update(msg)
 
     def action_toggle_edit(self) -> None:

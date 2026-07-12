@@ -21,16 +21,17 @@ from .tables import TAB_HEADERS
 def _output_base() -> Path:
     """Parent directory for the ``<domain>_<ts>/`` scan folder.
 
-    Running from the source checkout (or an editable ``pip install -e .``) keeps the
-    repo's gitignored ``output/`` folder — the package sits next to ``pyproject.toml``.
-    Installed elsewhere (e.g. via pipx/uv) there is no such marker: the scan folder is
-    dropped straight into the current working directory (no wrapping ``output/`` dir),
-    rather than some hidden site-packages path.
+    Keyed on the current working directory, not on where the package is installed —
+    an editable install still runs from wherever the user `cd`'d to. If cwd is the
+    project's own source checkout (a ``pyproject.toml`` next to the ``webscanner/``
+    package) results go in the repo's gitignored ``output/`` folder, keeping the
+    checkout tidy. Anywhere else, the ``<domain>_<ts>/`` folder is written straight
+    into the current directory.
     """
-    repo_root = Path(__file__).resolve().parents[2]  # webscanner/ui/export.py -> repo root
-    if (repo_root / "pyproject.toml").is_file():
-        return repo_root / "output"
-    return Path.cwd()
+    cwd = Path.cwd()
+    if (cwd / "pyproject.toml").is_file() and (cwd / "webscanner" / "__init__.py").is_file():
+        return cwd / "output"
+    return cwd
 
 
 def _stringify(value: Any) -> str:
