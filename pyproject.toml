@@ -54,7 +54,6 @@ packages = ["webscanner"]
 include = [
     "/webscanner",
     "/app.py",
-    "/prototype.py",
     "/README.md",
     "/LICENSE",
     "/requirements.txt",

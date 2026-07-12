@@ -1,10 +1,23 @@
+# Python
 __pycache__/
+*.py[cod]
+.venv*
+
+# Build / packaging artifacts
+build/
+dist/
+*.egg-info/
+
+# macOS
 .DS_Store
 **/.DS_Store
-.venv*
+
+# App output (CSV exports)
 output/
+
+# Local docs / agent files (patterns are case-sensitive on Linux — match real filenames)
 .claude/
 .agents/
-**/claude.md
-**/agents.md
-**/learnings.md
+**/CLAUDE.md
+**/AGENTS.md
+**/LEARNINGS.md
