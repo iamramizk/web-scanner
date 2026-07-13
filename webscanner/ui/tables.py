@@ -181,13 +181,18 @@ def render_table(
             table.add_column(c1, style=KEY_STYLE, ratio=ratio[0], no_wrap=False, overflow="fold")
             table.add_column(c2, ratio=ratio[1], no_wrap=False, overflow="fold")
         else:
+            # ``ratio`` on the value column makes it the sole flexible column, so
+            # Table(expand=True) routes all surplus width there and the fixed-width
+            # key column stays put — otherwise Rich spreads the surplus across both
+            # columns proportionally and the key column widens when values are short
+            # (e.g. an empty Robots/Schema section in the SEO tab).
             table.add_column(c1, style=KEY_STYLE, width=key_width, no_wrap=True, overflow="ellipsis")
-            table.add_column(c2, no_wrap=False, overflow="fold")
+            table.add_column(c2, ratio=1, no_wrap=False, overflow="fold")
         _add_spaced(table, rows, spaced)
     elif isinstance(data, (list, tuple)):
         c1, c2 = headers or ("#", "Value")
         table.add_column(c1, style="dim", width=5)  # left-aligned index
-        table.add_column(c2, no_wrap=False, overflow="fold")
+        table.add_column(c2, ratio=1, no_wrap=False, overflow="fold")
         rows = [(str(i), _value_cell(str(row))) for i, row in enumerate(data, 1)]
         _add_spaced(table, rows, spaced)
     else:
