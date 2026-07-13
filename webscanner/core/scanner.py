@@ -62,6 +62,7 @@ class AsyncScanner:
                 self.ctx.html = r["html"]
                 self.ctx.response_time_ms = r["elapsed_ms"]
                 self.ctx.final_url = r["final_url"]
+                self.ctx.redirect_status = r["redirect"]
             except Exception as exc:  # noqa: BLE001 - surfaced, not raised
                 self.ctx.fetch_error = repr(exc)
 

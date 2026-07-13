@@ -235,6 +235,10 @@ def render_status(ctx: ScanContext, tech: list[str] | None = None) -> Table:
     else:
         state = Text.from_markup("[dim]…[/]")
     table.add_row("Status", state)
+    if ctx.final_url:
+        table.add_row("Final URL", dim(ctx.final_url))
+    if ctx.redirect_status:
+        table.add_row("Redirected", dim(ctx.redirect_status))
     table.add_row("IP", dim(ctx.ip or "-"))
 
     # Location: flag emoji stays in colour (not dimmed), the text is dim.

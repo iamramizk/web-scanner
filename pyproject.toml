@@ -49,6 +49,7 @@ packages = ["webscanner"]
 [tool.hatch.build.targets.wheel.force-include]
 "webscanner/ui/app.tcss" = "webscanner/ui/app.tcss"
 "webscanner/ui/data/countries.json" = "webscanner/ui/data/countries.json"
+"webscanner/net/data/public_suffix_list.dat" = "webscanner/net/data/public_suffix_list.dat"
 
 [tool.hatch.build.targets.sdist]
 include = [

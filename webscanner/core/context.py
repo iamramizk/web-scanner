@@ -26,6 +26,7 @@ class ScanContext:
     status_code: int | None = None
     response_time_ms: float | None = None
     final_url: str | None = None
+    redirect_status: str | None = None  # e.g. "301 Moved Permanently" for cross-domain redirects
     tls_cert: dict[str, Any] | None = None
     geo: dict[str, Any] | None = None
     fetch_error: str | None = None
