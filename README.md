@@ -10,7 +10,7 @@ panel that stay pinned in place.
 resolvers for blocklist checks, the system `whois`, and stdlib `ssl`/`socket`. Country
 borders are embedded (Natural Earth), so even the map needs no tile service.
 
-![WebScanner](.github/screenshot-v2.png)
+![WebScanner](https://raw.githubusercontent.com/iamramizk/web-scanner/main/.github/screenshot-v2.png)
 
 ## Features
 
