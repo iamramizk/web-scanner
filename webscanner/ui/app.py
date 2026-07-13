@@ -16,7 +16,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
 from textual.message import Message
-from textual.widgets import Input, Static
+from textual.widgets import Input, LoadingIndicator, Static
 
 from ..core import AsyncScanner, ModuleStatus, ScanContext, ScanEvent
 from ..core.scanner import PREFETCH
@@ -85,6 +85,7 @@ class WebScannerApp(App):
             yield TabBar(self.modules, id="tabs")
         with Grid(id="grid"):
             with VerticalScroll(id="main"):
+                yield LoadingIndicator(id="main-loading")
                 yield Static("", id="main-content")
             yield MapPanel(id="map")
             with VerticalScroll(id="status"):
@@ -94,7 +95,7 @@ class WebScannerApp(App):
             yield Static("", id="progress")
 
     def on_mount(self) -> None:
-        self.query_one("#topbar").border_title = "🌐 WebScanner"
+        self.query_one("#topbar").border_title = "WebScanner"
         self.query_one("#map").border_title = "server location"
         self.query_one("#status", VerticalScroll).border_title = "Server"
         self._spinner_timer = self.set_interval(0.08, self._tick, pause=True)
@@ -120,7 +121,7 @@ class WebScannerApp(App):
         for module in self.modules:
             tabs.set_status(module.name, ModuleStatus.PENDING)
 
-        self._set_main("[dim]scanning…[/]")
+        self._set_main_loading(True)
         self.query_one("#map", MapPanel).show_loading()
         self.query_one("#status-content", StatusPanel).show_loading(self.ctx)
         self._spinner_timer.resume()
@@ -187,7 +188,7 @@ class WebScannerApp(App):
             return
         frame = _SPINNER[self._frame]
         self.query_one("#progress", Static).update(
-            f"{frame} scanning… {self.completed}/{len(self.modules)}"
+            f"[b white]{frame} scanning… {self.completed}/{len(self.modules)}[/]"
         )
 
     # ---- tab selection ----------------------------------------------------
@@ -209,12 +210,21 @@ class WebScannerApp(App):
         # matching where real section content begins.
         self.query_one("#main-content", Static).update(f"\n {markup}")
 
+    def _set_main_loading(self, loading: bool) -> None:
+        """Toggle the in-panel LoadingIndicator vs. the content Static (keeps the
+        panel's own border + title, unlike Widget.loading which covers them)."""
+        self.query_one("#main-loading", LoadingIndicator).display = loading
+        self.query_one("#main-content", Static).display = not loading
+
     def _refresh_main(self) -> None:
         self._update_main_title()
         result = self.results.get(self.selected)
+        # Spinner inside the panel until this tab's module completes; swap back to
+        # the content once there's a result to render.
+        self._set_main_loading(result is None)
         if result is None:
-            self._set_main("[dim]scanning…[/]")
-        elif result.status is ModuleStatus.FAILED:
+            return
+        if result.status is ModuleStatus.FAILED:
             self._set_main(f"[red]failed:[/] {result.error}")
         elif result.status is ModuleStatus.EMPTY:
             self._set_main("[dim]no data found[/]")

@@ -77,6 +77,14 @@ Tab.-selected {
     scrollbar-size: 0 0;   /* keep wheel/key scroll, hide the bar */
 }
 
+/* In-panel loading spinner: fills the content area, transparent so the panel
+   bg shows through; hidden until a scan sets it visible. Lives inside #main so
+   the panel border + title stay put (unlike Widget.loading, which covers them). */
+#main-loading {
+    display: none;
+    background: transparent;
+}
+
 #map {
     height: 100%;
     border: round $primary;

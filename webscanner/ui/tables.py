@@ -43,7 +43,9 @@ def render_result(name: str, data: Any) -> RenderableType:
     if isinstance(data, Grid):
         return render_grid(data)
     if isinstance(data, Sections):
-        return render_sections(data)
+        # SEO pins all sub-tables to one fixed first-column width so its four
+        # tables (Content/Keywords/Robots/Schema) line up exactly.
+        return render_sections(data, key_width=12 if name == "seo" else None)
     return render_table(data, TAB_HEADERS.get(name))
 
 
@@ -76,11 +78,13 @@ def render_grid(grid: Grid) -> Table:
     return table
 
 
-def render_sections(sections: Sections) -> Group:
+def render_sections(sections: Sections, key_width: int | None = None) -> Group:
     """Render several titled sub-tables stacked; content-fit sections share one
-    first-column width, ratio sections use their fixed proportions."""
-    widths = [_col1_width(s.data, s.headers, upper=False) for s in sections if not s.ratio]
-    key_width = max([w for w in widths if w], default=None)
+    first-column width, ratio sections use their fixed proportions. A caller may
+    pass ``key_width`` to pin that shared first-column width explicitly."""
+    if key_width is None:
+        widths = [_col1_width(s.data, s.headers, upper=False) for s in sections if not s.ratio]
+        key_width = max([w for w in widths if w], default=None)
     parts: list[RenderableType] = [Text("")]  # space above the first section title
     for i, sec in enumerate(sections):
         if i:
