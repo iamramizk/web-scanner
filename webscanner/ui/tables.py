@@ -36,6 +36,28 @@ TAB_HEADERS: dict[str, tuple[str, str]] = {
 #: cap on the (content-fit) first-column width
 MAX_KEY_WIDTH = 34
 
+# Tabs whose key column is smart-cased (Title Case, acronyms kept upper) instead of
+# ALL CAPS. dns stays "upper" — its keys are record types (AAAA/CNAME/DNSKEY/DMARC).
+_SMART_LABEL_TABS = {"whois", "ssl", "headers"}
+
+# Tokens that render upper-case rather than Title-cased. Lowercase keys. Only needs
+# the acronyms that actually appear as key tokens in the smart-cased tabs — NOT an
+# exhaustive dictionary. Unknown tokens fall back to Title Case (correct for the long
+# tail, incl. header names from servers we've never seen). Extend freely.
+_ACRONYMS: frozenset[str] = frozenset({
+    # whois
+    "id", "url", "iana", "whois", "dnssec",
+    # ssl
+    "cn", "san", "ssl", "tls",
+    # headers / general web acronyms
+    "xss", "csp", "hsts", "cors", "www", "ua", "md5", "ip", "dns",
+    "http", "https", "uri", "api", "spf", "dkim", "dmarc",
+})
+
+
+def _smart_token(tok: str) -> str:
+    return tok.upper() if tok.lower() in _ACRONYMS else tok.capitalize()
+
 
 def render_result(name: str, data: Any) -> RenderableType:
     """Render a module's result: multi-column Grid, stacked sub-tables (Sections),
@@ -46,7 +68,8 @@ def render_result(name: str, data: Any) -> RenderableType:
         # SEO pins all sub-tables to one fixed first-column width so its four
         # tables (Content/Keywords/Robots/Schema) line up exactly.
         return render_sections(data, key_width=12 if name == "seo" else None)
-    return render_table(data, TAB_HEADERS.get(name))
+    mode = "smart" if name in _SMART_LABEL_TABS else "upper"
+    return render_table(data, TAB_HEADERS.get(name), mode=mode)
 
 
 def render_grid(grid: Grid) -> Table:
@@ -83,7 +106,7 @@ def render_sections(sections: Sections, key_width: int | None = None) -> Group:
     first-column width, ratio sections use their fixed proportions. A caller may
     pass ``key_width`` to pin that shared first-column width explicitly."""
     if key_width is None:
-        widths = [_col1_width(s.data, s.headers, upper=False) for s in sections if not s.ratio]
+        widths = [_col1_width(s.data, s.headers, mode="raw") for s in sections if not s.ratio]
         key_width = max([w for w in widths if w], default=None)
     parts: list[RenderableType] = [Text("")]  # space above the first section title
     for i, sec in enumerate(sections):
@@ -93,7 +116,7 @@ def render_sections(sections: Sections, key_width: int | None = None) -> Group:
         # title text with the table's cell padding
         parts.append(Text(f" {sec.title.upper()} ", style=SECTION_STYLE))
         parts.append(
-            render_table(sec.data, sec.headers, upper=False, spaced=sec.spaced, key_width=key_width, ratio=sec.ratio)
+            render_table(sec.data, sec.headers, mode="raw", spaced=sec.spaced, key_width=key_width, ratio=sec.ratio)
         )
     return Group(*parts)
 
@@ -108,9 +131,16 @@ def _stringify(value: Any) -> str:
     return str(value)
 
 
-def _label(key: Any, upper: bool) -> str:
+def _label(key: Any, mode: str = "upper") -> str:
+    """Format a dict key as a column label. ``mode``: ``"upper"`` (ALL CAPS),
+    ``"smart"`` (Title Case, acronyms kept upper), or ``"raw"`` (separators
+    normalised, original case)."""
     s = str(key).replace("_", " ").replace("-", " ")
-    return s.upper() if upper else s
+    if mode == "upper":
+        return s.upper()
+    if mode == "smart":
+        return " ".join(_smart_token(t) for t in s.split())
+    return s
 
 
 def _is_pairs(data: Any) -> bool:
@@ -129,12 +159,12 @@ def _value_cell(value: str) -> Text:
     return Text(value, style=MUTED)
 
 
-def _col1_width(data: Any, headers: tuple[str, str] | None, upper: bool) -> int | None:
+def _col1_width(data: Any, headers: tuple[str, str] | None, mode: str) -> int | None:
     """Content-fit width for the first column (incl. its header), or None for a
     fixed index column."""
     c1 = (headers or ("Field", "Value"))[0]
     if isinstance(data, dict):
-        labels = [len(_label(k, upper)) for k in data]
+        labels = [len(_label(k, mode)) for k in data]
     elif _is_pairs(data):
         labels = [len(str(a)) for a, _ in data]
     else:
@@ -145,17 +175,18 @@ def _col1_width(data: Any, headers: tuple[str, str] | None, upper: bool) -> int 
 def render_table(
     data: Any,
     headers: tuple[str, str] | None = None,
-    upper: bool = True,
+    mode: str = "upper",
     spaced: bool = True,
     key_width: int | None = None,
     ratio: tuple[int, int] | None = None,
 ) -> Table:
     """Generic key/value (dict), pair-list, or indexed (list) table.
 
-    ``headers`` labels the two columns. ``upper`` upper-cases dict keys. ``spaced``
-    inserts a blank line between rows. ``key_width`` fixes the first-column width
-    (content-fit by default). ``ratio`` (col1, col2) forces proportional columns
-    instead of content-fit (e.g. (3, 2) for 60/40).
+    ``headers`` labels the two columns. ``mode`` cases dict keys — ``"upper"``,
+    ``"smart"`` (Title Case, acronyms upper), or ``"raw"``. ``spaced`` inserts a
+    blank line between rows. ``key_width`` fixes the first-column width (content-fit
+    by default). ``ratio`` (col1, col2) forces proportional columns instead of
+    content-fit (e.g. (3, 2) for 60/40).
     """
     table = Table(
         show_header=headers is not None,
@@ -168,12 +199,12 @@ def render_table(
         padding=(0, 1),  # tight; row spacing added via spacer rows below
     )
     if key_width is None:
-        key_width = _col1_width(data, headers, upper)
+        key_width = _col1_width(data, headers, mode)
 
     if isinstance(data, dict) or _is_pairs(data):
         if isinstance(data, dict):
             c1, c2 = headers or ("Field", "Value")
-            rows = [(_label(k, upper), _value_cell(_stringify(v))) for k, v in data.items()]
+            rows = [(_label(k, mode), _value_cell(_stringify(v))) for k, v in data.items()]
         else:
             c1, c2 = headers or ("Name", "Value")
             rows = [(str(a), _value_cell(str(b))) for a, b in data]
