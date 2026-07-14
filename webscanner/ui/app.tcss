@@ -1,5 +1,8 @@
 Screen {
-    background: $background;
+    /* ansi_default = the host terminal's default background (emitted as an ANSI
+       escape, not a solid RGB). Requires App(ansi_color=True). Lets a
+       translucent terminal show the desktop through. */
+    background: ansi_default;
 }
 
 /* ---- top bar: domain input + tab row ---- */
@@ -14,6 +17,7 @@ Screen {
     height: 1;
     padding: 0;
     background: transparent;
+    color: white;
 }
 
 #tabs {
@@ -38,7 +42,7 @@ Tab.-selected {
 /* ---- bottom footer row: keybar (left) + progress (right) ---- */
 #footer {
     height: 1;
-    background: $background;
+    background: ansi_default;
 }
 
 /* ---- keybar (blends into the TUI bg) ---- */
@@ -46,7 +50,7 @@ Tab.-selected {
     width: 1fr;
     height: 1;
     padding: 0 1;
-    background: $background;
+    background: ansi_default;
     color: $text-muted;
 }
 

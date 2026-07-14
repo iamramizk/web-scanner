@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 
-from ..colors import GREEN, RED
+from ..colors import GREEN, RED, MUTED
 from ..core.module import ScanModule
 from ..core.context import ScanContext
 from ..core.models import Section, Sections
@@ -71,7 +71,7 @@ async def _port_open(ip: str, port: int) -> bool:
 async def _scan_ports(ip: str) -> dict[str, str]:
     opens = await asyncio.gather(*(_port_open(ip, p) for p in COMMON_PORTS))
     return {
-        f"{port} ({svc})": f"[{GREEN}]open[/]" if is_open else "[dim]closed[/]"
+        f"{port} ({svc})": f"[{GREEN}]open[/]" if is_open else f"[{MUTED}]closed[/]"
         for (port, svc), is_open in zip(COMMON_PORTS.items(), opens)
     }
 

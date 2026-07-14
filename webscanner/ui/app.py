@@ -66,7 +66,12 @@ class WebScannerApp(App):
     ]
 
     def __init__(self, target: str | None = None) -> None:
-        super().__init__()
+        # ansi_color=True keeps ANSI keywords (e.g. `ansi_default`) as real
+        # terminal escapes instead of converting them to concrete RGB. It does
+        # NOT downgrade our truecolor hex — only ANSI-named values are affected.
+        # This is what lets `Screen { background: ansi_default; }` emit the
+        # terminal's default background so a translucent terminal shows through.
+        super().__init__(ansi_color=True)
         self._target = target
         self.ctx: ScanContext | None = None
         self.modules = all_modules()

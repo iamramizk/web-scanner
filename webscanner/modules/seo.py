@@ -22,7 +22,7 @@ import requests
 from bs4 import BeautifulSoup
 from rich.markup import escape
 
-from ..colors import GREEN, RED
+from ..colors import GREEN, RED, MUTED
 from ..core.module import ScanModule
 from ..core.context import ScanContext
 from ..core.models import Section, Sections
@@ -49,7 +49,7 @@ _STOPWORDS = frozenset(
 def _len_line(text: str, lo: int, hi: int) -> str:
     n = len(text)
     colour = GREEN if lo <= n <= hi else RED
-    return f"[dim]{escape(text)}[/]\n[{colour}]{n} chars · rec. {lo}-{hi}[/]"
+    return f"[{MUTED}]{escape(text)}[/]\n[{colour}]{n} chars · rec. {lo}-{hi}[/]"
 
 
 class SeoModule(ScanModule):

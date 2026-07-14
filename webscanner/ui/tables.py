@@ -9,7 +9,7 @@ from rich import box
 from rich.table import Table
 from rich.text import Text
 
-from ..colors import RED
+from ..colors import RED, MUTED
 from ..core.context import ScanContext
 from ..core.models import Grid, Sections
 
@@ -69,7 +69,7 @@ def render_grid(grid: Grid) -> Table:
         if i == 0:
             table.add_column(col, style=KEY_STYLE, no_wrap=True, overflow="ellipsis")
         else:
-            table.add_column(col, style="dim", no_wrap=False, overflow="fold")
+            table.add_column(col, style=MUTED, no_wrap=False, overflow="fold")
     rows = [[str(cell) for cell in row] for row in grid]
     for i, row in enumerate(rows):
         table.add_row(*row)
@@ -123,10 +123,10 @@ def _is_pairs(data: Any) -> bool:
 
 
 def _value_cell(value: str) -> Text:
-    """Value cell: keep intentional colour markup (Security), otherwise dim."""
+    """Value cell: keep intentional colour markup (Security), else muted grey."""
     if "[/]" in value:
         return Text.from_markup(value)
-    return Text(value, style="dim")
+    return Text(value, style=MUTED)
 
 
 def _col1_width(data: Any, headers: tuple[str, str] | None, upper: bool) -> int | None:
@@ -229,11 +229,11 @@ def render_status(ctx: ScanContext, tech: list[str] | None = None) -> Table:
     table.add_column("v", overflow="fold")
 
     def dim(value: Any) -> Text:
-        return Text(str(value), style="dim")
+        return Text(str(value), style=MUTED)
 
     if ctx.online:
         state = Text.from_markup(
-            f"[green]● online[/]  [dim]{ctx.status_code} · {ctx.response_time_ms:.0f}ms[/]"
+            f"[green]● online[/]  [{MUTED}]{ctx.status_code} · {ctx.response_time_ms:.0f}ms[/]"
         )
     elif ctx.fetch_error is not None:
         state = Text.from_markup(f"[{RED}]● offline[/]")
@@ -246,13 +246,13 @@ def render_status(ctx: ScanContext, tech: list[str] | None = None) -> Table:
         table.add_row("Redirected", dim(ctx.redirect_status))
     table.add_row("IP", dim(ctx.ip or "-"))
 
-    # Location: flag emoji stays in colour (not dimmed), the text is dim.
+    # Location: flag emoji stays in colour (not dimmed), the text is muted.
     if geo:
         loc = Text()
         flag = _flag(geo.get("countryCode"))
         if flag:
             loc.append(flag + " ")
-        loc.append(f"{geo.get('city', '-')}, {geo.get('country', '-')}", style="dim")
+        loc.append(f"{geo.get('city', '-')}, {geo.get('country', '-')}", style=MUTED)
     else:
         loc = dim("-")
     table.add_row("Location", loc)
