@@ -46,6 +46,52 @@ _STOPWORDS = frozenset(
 )
 
 
+# JSON syntax-highlight colours (dark-friendly, aligned with the app palette).
+_J_KEY = "#5FAFFF"   # object keys — blue
+_J_STR = GREEN       # string values
+_J_NUM = "#D7AF87"   # numbers — amber
+_J_KW = RED          # true / false / null
+_J_PUNCT = MUTED     # braces, brackets, commas, colons
+
+_JSON_TOKEN = re.compile(
+    r'(?P<space>\s+)'
+    r'|(?P<str>"(?:[^"\\]|\\.)*")'
+    r'|(?P<num>-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)'
+    r'|(?P<kw>true|false|null)'
+    r'|(?P<punct>[{}\[\],:])'
+)
+
+
+def _highlight_json(obj: object) -> str:
+    """Pretty-print `obj` as indented JSON with Rich colour markup. Brackets in
+    the payload are escaped so Rich doesn't parse them; `_value_cell` renders the
+    markup and CSV export strips it back to plain JSON."""
+    raw = json.dumps(obj, indent=2, ensure_ascii=False)
+    tokens = list(_JSON_TOKEN.finditer(raw))
+    out: list[str] = []
+    pos = 0
+    for i, m in enumerate(tokens):
+        if m.start() > pos:  # any char the tokenizer skipped, kept verbatim
+            out.append(escape(raw[pos:m.start()]))
+        pos = m.end()
+        kind, text = m.lastgroup, m.group()
+        if kind == "space":
+            out.append(text)
+        elif kind == "str":
+            # a string is a key iff the next non-space token is a colon
+            nxt = next((t for t in tokens[i + 1:] if t.lastgroup != "space"), None)
+            colour = _J_KEY if nxt and nxt.group() == ":" else _J_STR
+            out.append(f"[{colour}]{escape(text)}[/]")
+        elif kind == "num":
+            out.append(f"[{_J_NUM}]{text}[/]")
+        elif kind == "kw":
+            out.append(f"[{_J_KW}]{text}[/]")
+        else:  # punct
+            out.append(f"[{_J_PUNCT}]{escape(text)}[/]")
+    out.append(escape(raw[pos:]))
+    return "".join(out)
+
+
 def _len_line(text: str, lo: int, hi: int) -> str:
     n = len(text)
     colour = GREEN if lo <= n <= hi else RED
@@ -88,8 +134,8 @@ class SeoModule(ScanModule):
                 pass
         schema: dict[str, str] = {"Has Schema": f"[{GREEN}]Yes[/]" if blocks else f"[{RED}]No[/]"}
         if blocks:
-            schema["Schema"] = json.dumps(
-                blocks[0] if len(blocks) == 1 else blocks, indent=2, ensure_ascii=False
+            schema["Schema"] = _highlight_json(
+                blocks[0] if len(blocks) == 1 else blocks
             )
 
         # --- Content ---

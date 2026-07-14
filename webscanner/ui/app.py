@@ -100,7 +100,7 @@ class WebScannerApp(App):
             yield Static("", id="progress")
 
     def on_mount(self) -> None:
-        self.query_one("#topbar").border_title = "WebScanner"
+        self.query_one("#topbar").border_title = "🌐 WebScanner"
         self.query_one("#map").border_title = "server location"
         self.query_one("#status", VerticalScroll).border_title = "Server"
         self._spinner_timer = self.set_interval(0.08, self._tick, pause=True)
