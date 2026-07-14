@@ -25,7 +25,9 @@ from .export import export_csvs
 from .tables import render_result
 from .widgets import MapPanel, StatusPanel, TabBar, Tab
 
-_SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+#: width (cells) of the footer progress bar and its dim (incomplete) colour
+_BAR_WIDTH = 22
+_BAR_DIM = "grey30"
 
 
 class ScanProgress(Message):
@@ -79,7 +81,6 @@ class WebScannerApp(App):
         self.selected = self.modules[0].name
         self.completed = 0
         self.failed = 0
-        self._frame = 0
         self._scanning = False
 
     # ---- layout -----------------------------------------------------------
@@ -103,7 +104,6 @@ class WebScannerApp(App):
         self.query_one("#topbar").border_title = "🌐 WebScanner"
         self.query_one("#map").border_title = "server location"
         self.query_one("#status", VerticalScroll).border_title = "Server"
-        self._spinner_timer = self.set_interval(0.08, self._tick, pause=True)
         self.query_one("#tabs", TabBar).set_selected(self.selected)
         self._update_main_title()
         self._set_keybar(editing=False)
@@ -129,7 +129,7 @@ class WebScannerApp(App):
         self._set_main_loading(True)
         self.query_one("#map", MapPanel).show_loading()
         self.query_one("#status-content", StatusPanel).show_loading(self.ctx)
-        self._spinner_timer.resume()
+        self._update_progress()
 
         # Blur the input so single-key nav (←/→, q, r) reaches the app rather
         # than being typed into the field; Escape refocuses it to edit.
@@ -178,22 +178,23 @@ class WebScannerApp(App):
 
     def on_scan_finished(self, message: ScanFinished) -> None:
         self._scanning = False
-        self._spinner_timer.pause()
         total = len(self.modules)
         self.query_one("#progress", Static).update(f"done · {total}/{total}")
 
     # ---- progress line ----------------------------------------------------
 
-    def _tick(self) -> None:
-        self._frame = (self._frame + 1) % len(_SPINNER)
-        self._update_progress()
-
     def _update_progress(self) -> None:
+        """Draw a determinate progress bar (blue = done, grey = remaining) with the
+        percentage and n/total count in white, right-aligned on the footer row."""
         if not self._scanning:
             return
-        frame = _SPINNER[self._frame]
+        total = len(self.modules)
+        frac = self.completed / total if total else 0
+        filled = round(frac * _BAR_WIDTH)
+        blue = self.current_theme.primary
+        bar = f"[{blue}]{'━' * filled}[/][{_BAR_DIM}]{'━' * (_BAR_WIDTH - filled)}[/]"
         self.query_one("#progress", Static).update(
-            f"[b white]{frame} scanning… {self.completed}/{len(self.modules)}[/]"
+            f"{bar} [white]{round(frac * 100)}% {self.completed}/{total}[/]"
         )
 
     # ---- tab selection ----------------------------------------------------
