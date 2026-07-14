@@ -16,7 +16,7 @@ from typing import Any, Iterator
 from rich.text import Text
 
 from ..core.models import Grid, ModuleStatus, Sections
-from .tables import TAB_HEADERS
+from .tables import TAB_HEADERS, _SMART_LABEL_TABS, _label
 
 def _output_base() -> Path:
     """Parent directory for the ``<domain>_<ts>/`` scan folder.
@@ -50,10 +50,6 @@ def _plain(value: Any) -> str:
     return Text.from_markup(s).plain if "[/]" in s else s
 
 
-def _label(key: Any) -> str:
-    return str(key).replace("_", " ").replace("-", " ")
-
-
 def _is_pairs(data: Any) -> bool:
     return (
         isinstance(data, (list, tuple))
@@ -62,11 +58,16 @@ def _is_pairs(data: Any) -> bool:
     )
 
 
-def _rows_from(data: Any) -> Iterator[tuple[str, str]]:
-    """Yield (field, value) plain-text pairs for a dict / pair-list / scalar-list."""
+def _rows_from(data: Any, mode: str = "raw") -> Iterator[tuple[str, str]]:
+    """Yield (field, value) plain-text pairs for a dict / pair-list / scalar-list.
+
+    ``mode`` cases dict keys the same way the on-screen table does (see
+    ``tables._label``): ``"smart"`` for whois/ssl/headers, ``"upper"`` for dns,
+    ``"raw"`` for Sections sub-tables.
+    """
     if isinstance(data, dict):
         for k, v in data.items():
-            yield _label(k), _plain(v)
+            yield _label(k, mode), _plain(v)
     elif _is_pairs(data):
         for a, b in data:
             yield _plain(a), _plain(b)
@@ -90,8 +91,9 @@ def _write_tab(path: Path, name: str, data: Any) -> None:
                 for field, value in _rows_from(sec.data):
                     writer.writerow([sec.title, field, value])
         else:
+            mode = "smart" if name in _SMART_LABEL_TABS else "upper"
             writer.writerow(list(TAB_HEADERS.get(name, ("Field", "Value"))))
-            for field, value in _rows_from(data):
+            for field, value in _rows_from(data, mode):
                 writer.writerow([field, value])
 
 
