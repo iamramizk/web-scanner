@@ -19,40 +19,44 @@ from ..core.context import ScanContext
 RECORD_TYPES = ("A", "AAAA", "NS", "CNAME", "SOA", "MX", "TXT", "CAA", "DS", "DNSKEY")
 
 # Known DKIM selectors across the major providers/ESPs. DKIM can't be enumerated
-# from DNS alone, so we probe this list of well-known selectors.
-DKIM_SELECTORS = (
-    # generic
-    "default", "dkim", "mail", "selector", "s", "s1", "s2", "key1", "dk",
+# from DNS alone, so we probe this list of well-known selectors. The value is the
+# provider a hit points to (shown next to the selector); an empty string means the
+# selector is generic and doesn't identify a provider on its own.
+DKIM_SELECTORS: dict[str, str] = {
+    # generic — the selector name alone doesn't identify a provider
+    "default": "", "dkim": "", "mail": "", "selector": "", "s": "",
+    "s1": "", "s2": "", "key1": "", "dk": "",
     # Microsoft 365 / Outlook
-    "selector1", "selector2",
+    "selector1": "Microsoft 365", "selector2": "Microsoft 365",
     # Google Workspace
-    "google",
+    "google": "Google Workspace",
     # Amazon SES
-    "amazonses",
+    "amazonses": "Amazon SES",
     # Zoho
-    "zoho", "zmail",
+    "zoho": "Zoho", "zmail": "Zoho",
     # ProtonMail
-    "protonmail", "protonmail2", "protonmail3",
+    "protonmail": "Proton Mail", "protonmail2": "Proton Mail", "protonmail3": "Proton Mail",
     # Fastmail
-    "fm1", "fm2", "fm3",
+    "fm1": "Fastmail", "fm2": "Fastmail", "fm3": "Fastmail",
     # Mailchimp / Mandrill
-    "k1", "k2", "k3", "mandrill",
+    "k1": "Mailchimp", "k2": "Mailchimp", "k3": "Mailchimp", "mandrill": "Mandrill",
     # SendGrid
-    "smtpapi",
+    "smtpapi": "SendGrid",
     # Postmark
-    "pm",
+    "pm": "Postmark",
     # Mailgun / generic smtp
-    "smtp", "mg", "mailo",
+    "smtp": "", "mg": "Mailgun", "mailo": "",
     # Campaign Monitor
-    "cm",
+    "cm": "Campaign Monitor",
     # Apple iCloud
-    "sig1",
+    "sig1": "Apple iCloud",
     # HubSpot
-    "hs1", "hs2",
+    "hs1": "HubSpot", "hs2": "HubSpot",
     # misc common
-    "mxvault", "everlytickey1", "everlytickey2", "titan1", "titan2",
-    "turbo-smtp", "mailjet", "sendinblue", "klaviyo",
-)
+    "mxvault": "MXVault", "everlytickey1": "Everlytic", "everlytickey2": "Everlytic",
+    "titan1": "Titan", "titan2": "Titan", "turbo-smtp": "TurboSMTP",
+    "mailjet": "Mailjet", "sendinblue": "Brevo (Sendinblue)", "klaviyo": "Klaviyo",
+}
 
 
 def _is_dkim(records: list[str]) -> bool:
@@ -92,5 +96,8 @@ class DnsModule(ScanModule):
             out["DMARC"] = dmarc_records
         found = [s for s in dkim_hits if s]
         if found:
-            out["DKIM"] = found
+            out["DKIM"] = [
+                f"{s}  ({DKIM_SELECTORS[s]})" if DKIM_SELECTORS[s] else s
+                for s in found
+            ]
         return out
