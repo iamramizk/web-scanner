@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
@@ -60,6 +60,24 @@ class Sections(list):
     A ``list`` of :class:`Section`. Used by modules (e.g. Security) that show more
     than one table under a single tab.
     """
+
+
+@dataclass(slots=True)
+class TreeNode:
+    """One node in a hierarchical result (e.g. the Sitemap tab's URL tree).
+
+    The module returns a synthetic root ``TreeNode`` whose descendants mirror the
+    site's URL-path hierarchy (``/blog`` → ``/blog/post-1`` …). A node is a branch
+    (expandable folder) iff it has ``children``; otherwise it's a leaf (a page). The
+    UI turns the root into a Textual ``Tree`` widget. ``total`` (set on the root only)
+    is the count of page URLs behind the tree, shown in the panel subtitle. ``url`` is
+    the full page URL a node stands for (set on leaves), so the UI can make it clickable.
+    """
+
+    label: str
+    children: list["TreeNode"] = field(default_factory=list)
+    total: int | None = None
+    url: str | None = None
 
 
 class Grid(list):

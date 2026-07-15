@@ -89,6 +89,41 @@ Tab.-selected {
     background: transparent;
 }
 
+/* Sitemap tab: a Tree instead of the Static table. Blends into the panel bg and
+   hides its own scrollbar (the #main VerticalScroll scrolls it). Hidden until the
+   Sitemap tab is selected and its module has produced a tree. */
+#main-tree {
+    display: none;
+    height: auto;
+    padding: 1 0 0 1;
+    background: transparent;
+    scrollbar-size: 0 0;
+}
+#main-tree:focus {
+    background: transparent;
+}
+/* Show the connector guides for every branch, not just the selected one (Textual's
+   default guide colour is nearly invisible); the cursor's branch stays primary. */
+#main-tree > .tree--guides,
+#main-tree > .tree--guides-hover {
+    color: #6b6b6b;
+}
+#main-tree > .tree--guides-selected {
+    color: $primary;
+    text-style: bold;
+}
+/* Leaf pages are @click links (click to open the URL). Neutralise Textual's default
+   link styling so they render EXACTLY like plain leaf text — no underline, no hover
+   colour/background change. */
+#main-tree {
+    link-style: not underline;
+    link-color: $text;
+    link-background: transparent;
+    link-style-hover: not underline;
+    link-color-hover: $text;
+    link-background-hover: transparent;
+}
+
 #map {
     height: 100%;
     border: round $primary;

@@ -23,7 +23,7 @@ from ..core.scanner import PREFETCH
 from ..modules import all_modules
 from .export import export_csvs
 from .tables import render_result
-from .widgets import MapPanel, StatusPanel, TabBar, Tab
+from .widgets import MapPanel, SitemapTree, StatusPanel, TabBar, Tab
 
 #: width (cells) of the footer progress bar and its dim (incomplete) colour
 _BAR_WIDTH = 22
@@ -82,6 +82,9 @@ class WebScannerApp(App):
         self.completed = 0
         self.failed = 0
         self._scanning = False
+        # last result rendered into the sitemap Tree, so switching tabs doesn't
+        # rebuild (and re-collapse) it every visit.
+        self._tree_result = None
 
     # ---- layout -----------------------------------------------------------
 
@@ -93,6 +96,7 @@ class WebScannerApp(App):
             with VerticalScroll(id="main"):
                 yield LoadingIndicator(id="main-loading")
                 yield Static("", id="main-content")
+                yield SitemapTree(id="main-tree")
             yield MapPanel(id="map")
             with VerticalScroll(id="status"):
                 yield StatusPanel(id="status-content")
@@ -121,6 +125,7 @@ class WebScannerApp(App):
         self.completed = 0
         self.failed = 0
         self._scanning = True
+        self._tree_result = None
 
         tabs = self.query_one("#tabs", TabBar)
         for module in self.modules:
@@ -206,10 +211,16 @@ class WebScannerApp(App):
         self.selected = name
         self.query_one("#tabs", TabBar).set_selected(name)
         self._refresh_main()
+        # keybar depends on the selected tab (Sitemap shows tree-nav hints); keep
+        # the editing state if the domain input still has focus.
+        editing = self.focused is not None and self.focused.id == "domain"
+        self._set_keybar(editing=editing)
 
     def _update_main_title(self) -> None:
         label = next(m.label for m in self.modules if m.name == self.selected)
-        self.query_one("#main").border_title = label
+        main = self.query_one("#main")
+        main.border_title = label
+        main.border_subtitle = ""  # only the Sitemap tab sets one (URL total)
 
     def _set_main(self, markup: str) -> None:
         # Leading blank line + space so placeholders sit clear of the border,
@@ -225,17 +236,51 @@ class WebScannerApp(App):
     def _refresh_main(self) -> None:
         self._update_main_title()
         result = self.results.get(self.selected)
-        # Spinner inside the panel until this tab's module completes; swap back to
-        # the content once there's a result to render.
-        self._set_main_loading(result is None)
-        if result is None:
+        tree = self.query_one("#main-tree", SitemapTree)
+        content = self.query_one("#main-content", Static)
+        loading = result is None
+        # Spinner inside the panel until this tab's module completes; swap to the
+        # Tree (Sitemap tab) or the Static content once there's a result to render.
+        self.query_one("#main-loading", LoadingIndicator).display = loading
+
+        want_tree = (
+            self.selected == "sitemap"
+            and result is not None
+            and result.status is ModuleStatus.DONE
+        )
+        tree.display = want_tree
+        content.display = not loading and not want_tree
+
+        if loading:
+            self._sync_focus()
             return
-        if result.status is ModuleStatus.FAILED:
+        if want_tree:
+            if self._tree_result is not result:
+                tree.populate(result.data)
+                self._tree_result = result
+            total = result.data.total
+            if total is not None:
+                self.query_one("#main").border_subtitle = f"{total} Total"
+        elif result.status is ModuleStatus.FAILED:
             self._set_main(f"[red]failed:[/] {result.error}")
         elif result.status is ModuleStatus.EMPTY:
-            self._set_main("[dim]no data found[/]")
+            msg = "no sitemap found" if self.selected == "sitemap" else "no data found"
+            self._set_main(f"[dim]{msg}[/]")
         else:
-            self.query_one("#main-content", Static).update(render_result(self.selected, result.data))
+            content.update(render_result(self.selected, result.data))
+        self._sync_focus()
+
+    def _sync_focus(self) -> None:
+        """Focus the Sitemap Tree while that tab is up (so ↑/↓/space reach it); drop
+        focus otherwise. Never steals focus from the domain input while editing."""
+        if self.focused is not None and self.focused.id == "domain":
+            return
+        tree = self.query_one("#main-tree", SitemapTree)
+        if tree.display:
+            if self.focused is not tree:
+                self.set_focus(tree)
+        elif self.focused is tree:
+            self.set_focus(None)
 
     def on_tab_clicked(self, message: Tab.Clicked) -> None:
         self._select(message.tab_name)
@@ -306,6 +351,12 @@ class WebScannerApp(App):
         c = self.current_theme.primary  # primary blue for key hints
         if editing:
             pairs = [("enter", "Scan"), ("esc", "Cancel")]
+        elif self.selected == "sitemap":
+            # tree-navigation hints, shown only while the Sitemap tab is up
+            pairs = [
+                ("←/→", "Tab"), ("↑/↓", "Move"), ("enter", "Toggle"),
+                ("space", "All"), ("r", "Rescan"), ("esc", "Edit"),
+            ]
         else:
             pairs = [("q", "Quit"), ("←/→", "Tab"), ("r", "Rescan"), ("s", "Save"), ("esc", "Edit domain")]
         text = "   ".join(f"[b {c}]{k}[/] {label}" for k, label in pairs)

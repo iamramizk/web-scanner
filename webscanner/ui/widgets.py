@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from rich.markup import escape
+from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.message import Message
-from textual.widgets import Static
+from textual.widgets import Static, Tree
 
 from ..core.context import ScanContext
-from ..core.models import ModuleStatus
+from ..core.models import ModuleStatus, TreeNode
 from .tables import render_status
 from .worldmap import country_name, render as render_map
 
@@ -99,3 +101,80 @@ class StatusPanel(Static):
 
     def set_ctx(self, ctx: ScanContext, tech: list[str] | None = None) -> None:
         self.update(render_status(ctx, tech))
+
+
+class SitemapTree(Tree):
+    """Sitemap tab: the site's URL-path hierarchy as a collapsed tree.
+
+    Navigation: ``up``/``down`` move the cursor (Textual defaults). ``enter`` toggles
+    the node under the cursor; ``space`` toggles the *whole* tree — expand all if
+    anything is collapsed, else collapse all (both override Textual's defaults, which
+    map space to a single node and shift+space to same-level siblings). The visible
+    ``/`` root is expanded by default; its children (the first URL slugs) start
+    collapsed. A node is a branch iff it has children; otherwise it's a leaf.
+
+    Leaf pages carry a ``@click`` action so a mouse click opens the URL in the browser
+    (styled to look identical to plain text — see the ``link-*`` rules in app.tcss).
+    URLs are held in ``_leaf_urls`` and referenced by index, so no URL text has to be
+    escaped into the click-action markup.
+    """
+
+    BINDINGS = [
+        Binding("enter", "toggle_node", "Toggle", show=False),
+        Binding("space", "toggle_all", "Expand/collapse all", show=False),
+    ]
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__("/", **kwargs)
+        self.show_root = True
+        self.guide_depth = 3
+        self._leaf_urls: list[str] = []
+
+    def populate(self, root: TreeNode) -> None:
+        """Rebuild from a data ``TreeNode``: the ``/`` root shows expanded, its
+        children collapsed."""
+        self.clear()
+        self._leaf_urls = []
+        self.root.set_label(root.label)  # "/"
+        self.root.expand()
+        for child in root.children:
+            self._add(self.root, child)
+
+    def _add(self, parent, data: TreeNode) -> None:
+        if data.children:
+            branch = parent.add(data.label, expand=False)
+            for child in data.children:
+                self._add(branch, child)
+        elif data.url:
+            index = len(self._leaf_urls)
+            self._leaf_urls.append(data.url)
+            parent.add_leaf(f"[@click=open_leaf({index})]{escape(data.label)}[/]")
+        else:
+            parent.add_leaf(data.label)  # e.g. the "… (truncated)" note — not a link
+
+    def action_open_leaf(self, index: int) -> None:
+        if 0 <= index < len(self._leaf_urls):
+            self.app.open_url(self._leaf_urls[index])
+
+    def action_toggle_all(self) -> None:
+        branches = self._branches()
+        if not branches:
+            return
+        if any(b.is_collapsed for b in branches):
+            self.root.expand_all()
+        else:
+            for child in self.root.children:
+                child.collapse_all()
+
+    def _branches(self) -> list:
+        """Every expandable node below the (hidden) root."""
+        out: list = []
+
+        def walk(node) -> None:
+            for child in node.children:
+                if child.allow_expand:
+                    out.append(child)
+                walk(child)
+
+        walk(self.root)
+        return out

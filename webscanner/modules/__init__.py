@@ -1,9 +1,10 @@
 """Scan module registry.
 
 ``all_modules()`` order defines the tab order in the UI:
-DNS · Whois · Subdomains · SSL · Security · Headers · Tech · SEO · Links
+DNS · Whois · Subdomains · SSL · Security · Headers · Tech · SEO · Sitemap · Links
 (Email auth — DMARC/DKIM — is folded into DNS. Security = ports + HTTP headers + blocklists.
-SEO = schema + content + keywords. Links = internal + external page links.)
+SEO = schema + content + keywords. Sitemap = the site's published sitemap(s) as a tree.
+Links = internal + external page links.)
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from .headers import HeadersModule
 from .links import LinksModule
 from .security import SecurityModule
 from .seo import SeoModule
+from .sitemap import SitemapModule
 from .ssl import SslModule
 from .subdomains import SubdomainsModule
 from .tech import TechModule
@@ -31,6 +33,7 @@ def all_modules() -> list[ScanModule]:
         HeadersModule(),
         TechModule(),
         SeoModule(),
+        SitemapModule(),
         LinksModule(),
     ]
 

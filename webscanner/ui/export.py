@@ -15,7 +15,7 @@ from typing import Any, Iterator
 
 from rich.text import Text
 
-from ..core.models import Grid, ModuleStatus, Sections
+from ..core.models import Grid, ModuleStatus, Sections, TreeNode
 from .tables import TAB_HEADERS, _SMART_LABEL_TABS, _label
 
 def _output_base() -> Path:
@@ -78,10 +78,25 @@ def _rows_from(data: Any, mode: str = "raw") -> Iterator[tuple[str, str]]:
         yield "", _plain(data)
 
 
+def _walk_tree(root: TreeNode, prefix: str = "", depth: int = 0) -> Iterator[tuple[int, str, str]]:
+    """Depth-first ``(depth, kind, path)`` for the tree, skipping the synthetic root.
+
+    ``path`` is the accumulated path (node labels already carry their ``/`` or host
+    separator); ``kind`` is ``folder`` (has children) or ``page`` (a leaf)."""
+    for child in root.children:
+        path = prefix + child.label
+        yield depth, ("folder" if child.children else "page"), path
+        yield from _walk_tree(child, path, depth + 1)
+
+
 def _write_tab(path: Path, name: str, data: Any) -> None:
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        if isinstance(data, Grid):
+        if isinstance(data, TreeNode):
+            writer.writerow(["Depth", "Type", "Path"])
+            for depth, kind, path in _walk_tree(data):
+                writer.writerow([depth, kind, path])
+        elif isinstance(data, Grid):
             writer.writerow(data.columns)
             for row in data:
                 writer.writerow([_plain(cell) for cell in row])

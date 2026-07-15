@@ -31,7 +31,7 @@ def _is_empty(data: object) -> bool:
         return True
     if isinstance(data, (dict, list, str, tuple, set)):
         return len(data) == 0
-    return False
+    return False  # a returned TreeNode is DONE; modules signal empty by returning None
 
 
 class AsyncScanner:
