@@ -30,6 +30,16 @@ _BAR_WIDTH = 22
 _BAR_DIM = "grey30"
 
 
+def _tech_names(data: object) -> list[str]:
+    """Unique technology names (order-preserving) from the Tech result — now a
+    ``Sections`` of per-group ``Grid``s, so a tech can recur across groups."""
+    seen: dict[str, None] = {}
+    for section in data or []:
+        for row in section.data:
+            seen.setdefault(row[0], None)
+    return list(seen)
+
+
 class ScanProgress(Message):
     """A ScanEvent surfaced onto the Textual message pump."""
 
@@ -178,7 +188,9 @@ class WebScannerApp(App):
         if event.name == self.selected:
             self._refresh_main()
         if event.name == "tech" and self.ctx is not None and event.result is not None:
-            self.query_one("#status-content", StatusPanel).set_ctx(self.ctx, event.result.data.names)
+            self.query_one("#status-content", StatusPanel).set_ctx(
+                self.ctx, _tech_names(event.result.data)
+            )
         self._update_progress()
 
     def on_scan_finished(self, message: ScanFinished) -> None:

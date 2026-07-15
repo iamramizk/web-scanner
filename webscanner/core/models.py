@@ -84,12 +84,17 @@ class Grid(list):
     """A multi-column table result: rows (list of value-lists) + column headers.
 
     A ``list`` of rows, so an empty ``Grid`` reports EMPTY via ``_is_empty``. The
-    first column is treated as each row's primary name.
+    first column is treated as each row's primary name. ``widths`` optionally pins
+    each column to a fixed character width (else content-fit) — used when several
+    Grids share a tab (e.g. Tech's per-group tables) so they all line up.
     """
 
-    def __init__(self, columns: list[str], rows: Any) -> None:
+    def __init__(
+        self, columns: list[str], rows: Any, widths: list[int] | None = None
+    ) -> None:
         super().__init__(rows)
         self.columns = list(columns)
+        self.widths = list(widths) if widths else None
 
     @property
     def names(self) -> list[str]:

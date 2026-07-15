@@ -101,10 +101,19 @@ def _write_tab(path: Path, name: str, data: Any) -> None:
             for row in data:
                 writer.writerow([_plain(cell) for cell in row])
         elif isinstance(data, Sections):
-            writer.writerow(["Section", "Field", "Value"])
-            for sec in data:
-                for field, value in _rows_from(sec.data):
-                    writer.writerow([sec.title, field, value])
+            # Sections of Grids (e.g. Tech's per-group tables) flatten with the
+            # section title as a leading "Group" column; key/value sections stay
+            # Section/Field/Value.
+            if data and isinstance(data[0].data, Grid):
+                writer.writerow(["Group", *data[0].data.columns])
+                for sec in data:
+                    for row in sec.data:
+                        writer.writerow([sec.title, *[_plain(c) for c in row]])
+            else:
+                writer.writerow(["Section", "Field", "Value"])
+                for sec in data:
+                    for field, value in _rows_from(sec.data):
+                        writer.writerow([sec.title, field, value])
         else:
             mode = "smart" if name in _SMART_LABEL_TABS else "upper"
             writer.writerow(list(TAB_HEADERS.get(name, ("Field", "Value"))))
