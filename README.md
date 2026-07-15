@@ -14,10 +14,11 @@ borders are embedded (Natural Earth), so even the map needs no tile service.
 
 ## Features
 
-Nine tabs, scanned concurrently and rendered live as each module finishes:
+Ten tabs, scanned concurrently and rendered live as each module finishes:
 
 - **DNS** — A / AAAA / NS / CNAME / SOA / MX / TXT / CAA / DS / DNSKEY records, plus email
-  authentication folded in: DMARC (`_dmarc`) and DKIM (probes ~40 common selectors).
+  authentication folded in: DMARC (`_dmarc`) and DKIM (probes ~40 common selectors, each
+  labelled with its email provider).
 - **Whois** — parsed system `whois`, with rich gTLD and ccTLD field support (registrar,
   dates, nameservers, per-contact details).
 - **Subdomains** — discovered natively from TLS certificate SANs and `socket` probes of
@@ -28,10 +29,12 @@ Nine tabs, scanned concurrently and rendered live as each module finishes:
   X-Frame-Options, …), and blocklist status across public filtering resolvers
   (AdGuard, CleanBrowsing, Cloudflare, Google, OpenDNS, Quad9).
 - **Headers** — the full set of HTTP response headers.
-- **Tech** — technology-stack detection via [Wappalyzer](https://github.com/tunetheweb/wappalyzer):
-  name, category, confidence, groups and version.
+- **Tech** — technology-stack detection via [Wappalyzer](https://github.com/tunetheweb/wappalyzer),
+  split into one table per technology group, each showing name, category, confidence and version.
 - **SEO** — page content (title/description with length hints, H1–H3, social links), top
   keyword n-grams, `robots.txt` and sitemaps, and JSON-LD structured data.
+- **Sitemap** — the site's URLs discovered from its `sitemap.xml` (recursing into nested
+  sitemap indexes) and rebuilt into a clickable URL-path tree — no crawling.
 - **Links** — internal and external links, with their anchor text.
 
 Alongside the tabs, two fixed panels:
@@ -39,7 +42,7 @@ Alongside the tabs, two fixed panels:
 - **Country map** — real country outlines auto-framed around the server's location, drawn
   with braille characters (`+` / `-` to zoom).
 - **Server** — online status and response time, IP, geolocation, ISP, AS, hosting provider
-  and detected tech.
+  and detected CMS (name and version, from the Tech scan).
 
 ## Installation
 
@@ -94,10 +97,12 @@ pipx install --force git+https://github.com/iamramizk/web-scanner
 
 ### Keys
 
-| Key             | Action                                                              |
-| --------------- | ------------------------------------------------------------------- |
-| `←` / `→` `Tab` | Switch tabs                                                         |
-| `r`             | Rescan                                                              |
-| `s`             | Save — export every tab to CSV under `output/<domain>_<timestamp>/` |
-| `esc`           | Edit the domain and scan a new one                                  |
-| `q`             | Quit                                                                |
+| Key              | Action                                                              |
+| ---------------- | ------------------------------------------------------------------- |
+| `←` / `→` `Tab`  | Switch tabs                                                         |
+| `+` / `-`        | Zoom the country map in / out                                       |
+| `↑` / `↓` `enter`| Navigate the Sitemap tree (`space` expands/collapses all)          |
+| `r`              | Rescan                                                              |
+| `s`              | Save — export every tab to CSV under `output/<domain>_<timestamp>/` |
+| `esc`            | Edit the domain and scan a new one                                  |
+| `q`              | Quit                                                                |
