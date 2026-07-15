@@ -30,14 +30,20 @@ _BAR_WIDTH = 22
 _BAR_DIM = "grey30"
 
 
-def _tech_names(data: object) -> list[str]:
-    """Unique technology names (order-preserving) from the Tech result — now a
-    ``Sections`` of per-group ``Grid``s, so a tech can recur across groups."""
-    seen: dict[str, None] = {}
+def _cms_from_tech(data: object) -> tuple[str, str | None] | None:
+    """The CMS (name, version) from the Tech result, or ``None`` if none detected.
+
+    The Tech result is a ``Sections`` of per-group ``Grid``s whose rows are
+    ``[name, categories, confidence, version]`` (see ``modules/tech.py``). A CMS is
+    any tech Wappalyzer tags with the ``CMS`` category — the reliable signal (the
+    broader "Content" *group* also covers non-CMS tools). ``categories`` is a
+    ", "-joined string; version is ``"-"`` when unknown → returned as ``None``.
+    """
     for section in data or []:
-        for row in section.data:
-            seen.setdefault(row[0], None)
-    return list(seen)
+        for name, categories, _confidence, version in section.data:
+            if "CMS" in [c.strip() for c in str(categories).split(",")]:
+                return name, (version if version and version != "-" else None)
+    return None
 
 
 class ScanProgress(Message):
@@ -189,7 +195,7 @@ class WebScannerApp(App):
             self._refresh_main()
         if event.name == "tech" and self.ctx is not None and event.result is not None:
             self.query_one("#status-content", StatusPanel).set_ctx(
-                self.ctx, _tech_names(event.result.data)
+                self.ctx, cms=_cms_from_tech(event.result.data)
             )
         self._update_progress()
 

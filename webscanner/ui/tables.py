@@ -254,8 +254,17 @@ def _flag(country_code: str | None) -> str:
     return "".join(chr(0x1F1E6 + ord(c) - ord("A")) for c in country_code.upper())
 
 
-def render_status(ctx: ScanContext, tech: list[str] | None = None) -> Table:
-    """Fixed status panel: online state, IP, location, ISP/AS, key tech."""
+#: sentinel: the Tech scan hasn't completed yet, so omit the CMS row entirely
+#: (distinct from a completed scan that found no CMS → "Not detected").
+UNSET = object()
+
+
+def render_status(ctx: ScanContext, cms: object = UNSET) -> Table:
+    """Fixed status panel: online state, IP, location, ISP/AS, CMS.
+
+    ``cms`` is ``UNSET`` before the Tech scan finishes (row omitted), ``None`` when
+    it finished with no CMS ("Not detected"), or ``(name, version|None)`` otherwise.
+    """
     geo = ctx.geo or {}
     table = Table(
         show_header=False,
@@ -303,6 +312,10 @@ def render_status(ctx: ScanContext, tech: list[str] | None = None) -> Table:
         table.add_row("Host", dim(org))
     table.add_row("ISP", dim(geo.get("isp") or "-"))
     table.add_row("AS", dim(geo.get("as") or "-"))
-    if tech:
-        table.add_row("Tech", dim(", ".join(tech[:8])))
+    if cms is not UNSET:
+        if cms is None:
+            table.add_row("CMS", dim("Not detected"))
+        else:
+            name, version = cms
+            table.add_row("CMS", dim(f"{name} {version}" if version else name))
     return table

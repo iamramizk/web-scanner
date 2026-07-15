@@ -10,7 +10,7 @@ from textual.widgets import Static, Tree
 
 from ..core.context import ScanContext
 from ..core.models import ModuleStatus, TreeNode
-from .tables import render_status
+from .tables import UNSET, render_status
 from .worldmap import country_name, render as render_map
 
 _STATUS_CLASSES = ("-pending", "-running", "-done", "-empty", "-failed")
@@ -99,8 +99,8 @@ class StatusPanel(Static):
     def show_loading(self, ctx: ScanContext) -> None:
         self.update(f"[dim]scanning {ctx.domain}…[/]")
 
-    def set_ctx(self, ctx: ScanContext, tech: list[str] | None = None) -> None:
-        self.update(render_status(ctx, tech))
+    def set_ctx(self, ctx: ScanContext, cms: object = UNSET) -> None:
+        self.update(render_status(ctx, cms))
 
 
 class SitemapTree(Tree):
