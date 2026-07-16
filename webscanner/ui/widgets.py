@@ -1,13 +1,18 @@
-"""Custom Textual widgets: tab bar, world-map panel, status panel."""
+"""Custom Textual widgets: tab bar, world-map panel, status panel, activity log."""
 
 from __future__ import annotations
 
+from collections import deque
+from datetime import datetime
+
 from rich.markup import escape
+from rich.text import Text
 from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.message import Message
-from textual.widgets import Static, Tree
+from textual.widgets import RichLog, Static, Tree
 
+from ..colors import BODY, MUTED
 from ..core.context import ScanContext
 from ..core.models import ModuleStatus, TreeNode
 from .tables import UNSET, render_status
@@ -101,6 +106,85 @@ class StatusPanel(Static):
 
     def set_ctx(self, ctx: ScanContext, cms: object = UNSET) -> None:
         self.update(render_status(ctx, cms))
+
+
+class ActivityLog(RichLog):
+    """Fixed scan log under the main panel; the newest line is always in view.
+
+    Lines are composed by ``activity.py`` — this only stamps the time, paints the
+    body, and decides how a too-long line is cut, so the wording stays testable
+    without an app.
+
+    Each line is written as a ``no_wrap`` / ``overflow="ellipsis"`` Text at the
+    panel's exact width, so it's truncated with "…" at the panel edge and a wider
+    terminal reveals more of it. Nothing is pre-cropped to an assumed width.
+
+    ``can_focus=False`` is load-bearing, not tidiness: RichLog inherits
+    ScrollableContainer's ungated up/down bindings, so a focused log would swallow
+    ↑/↓ from the Sitemap tree once it overflows. It also stops a click on the panel
+    from taking focus off the app, which is what keeps single-key nav (q/r/s/←/→)
+    working.
+    """
+
+    can_focus = False
+
+    #: scrollback kept for re-rendering on resize; matches RichLog's max_lines
+    _MAX_LINES = 200
+
+    def __init__(self, **kwargs) -> None:
+        # min_width=0: the 78 default renders every write at >=78 cells, overflowing
+        # a narrower panel. wrap=True: with wrap=False, RichLog forces
+        # overflow="ignore" on Text and the tail vanishes with no ellipsis.
+        super().__init__(markup=True, wrap=True, min_width=0, max_lines=self._MAX_LINES, **kwargs)
+        # RichLog renders to strips at write time and never re-renders, so keep the
+        # markup to replay when the width changes.
+        self._entries: deque[str] = deque(maxlen=self._MAX_LINES)
+        self._rendered_width: int | None = None
+
+    def add(self, body: str) -> None:
+        """Write one line, stamped with a muted [HH:MM:SS]."""
+        stamp = escape(f"[{datetime.now():%H:%M:%S}]")
+        markup = f"[{MUTED}]{stamp}[/] [{BODY}]{body}[/]"
+        self._entries.append(markup)
+        self._write(markup)
+
+    def _write(self, markup: str) -> None:
+        text = Text.from_markup(markup)
+        text.no_wrap = True
+        text.overflow = "ellipsis"
+        # Explicit width, because RichLog's own sizing measures against
+        # `app.console`, which is a plain 80 columns regardless of how wide the app
+        # actually is — every line would ellipsise at 80 on a wider terminal. Passing
+        # width bypasses measure/shrink/min_width entirely. Width 0 means we aren't
+        # laid out yet: let RichLog defer the write, and on_resize replays it.
+        width = self.scrollable_content_region.width
+        if width:
+            self.write(text, width=width)
+        else:
+            self.write(text)
+
+    def clear(self) -> "ActivityLog":
+        self._entries.clear()
+        super().clear()
+        return self
+
+    def on_resize(self, event) -> None:
+        # Flushes any deferred writes, once, when a size is first known.
+        super().on_resize(event)
+        width = self.scrollable_content_region.width
+        if not width or width == self._rendered_width:
+            return
+        self._rendered_width = width
+        if not self._entries:
+            return
+        # RichLog renders to strips at write time and never re-renders, so replay at
+        # the new width: a wider terminal reveals more of each line, a narrower one
+        # re-ellipsises. Also fixes the first sizing, where deferred lines were
+        # rendered by RichLog without our explicit width.
+        entries = list(self._entries)
+        super().clear()
+        for markup in entries:
+            self._write(markup)
 
 
 class SitemapTree(Tree):

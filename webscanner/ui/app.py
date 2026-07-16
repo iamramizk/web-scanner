@@ -13,6 +13,7 @@ live as each module completes.
 from __future__ import annotations
 
 import re
+import time
 
 from bs4 import BeautifulSoup
 from textual.app import App, ComposeResult
@@ -24,9 +25,10 @@ from textual.widgets import Input, LoadingIndicator, Static
 from ..core import AsyncScanner, ModuleStatus, ScanContext, ScanEvent
 from ..core.scanner import PREFETCH
 from ..modules import all_modules
+from . import activity
 from .export import export_csvs
 from .tables import render_result
-from .widgets import MapPanel, SitemapTree, StatusPanel, TabBar, Tab
+from .widgets import ActivityLog, MapPanel, SitemapTree, StatusPanel, TabBar, Tab
 
 #: width (cells) of the footer progress bar and its dim (incomplete) colour
 _BAR_WIDTH = 22
@@ -168,6 +170,9 @@ class WebScannerApp(App):
         self.completed = 0
         self.failed = 0
         self._scanning = False
+        # monotonic (not wall clock — immune to the system clock moving) start of the
+        # current scan, for the log's closing "completed in Ns".
+        self._scan_start = 0.0
         # last result rendered into the sitemap Tree, so switching tabs doesn't
         # rebuild (and re-collapse) it every visit.
         self._tree_result = None
@@ -179,10 +184,12 @@ class WebScannerApp(App):
             yield Input(value=self._target or "", placeholder="domain… (press enter to scan)", id="domain")
             yield TabBar(self.modules, id="tabs")
         with Grid(id="grid"):
-            with VerticalScroll(id="main"):
-                yield LoadingIndicator(id="main-loading")
-                yield Static("", id="main-content")
-                yield SitemapTree(id="main-tree")
+            with Vertical(id="left"):
+                with VerticalScroll(id="main"):
+                    yield LoadingIndicator(id="main-loading")
+                    yield Static("", id="main-content")
+                    yield SitemapTree(id="main-tree")
+                yield ActivityLog(id="activity")
             yield MapPanel(id="map")
             with VerticalScroll(id="status"):
                 yield StatusPanel(id="status-content")
@@ -194,6 +201,7 @@ class WebScannerApp(App):
         self.query_one("#topbar").border_title = "🌐 WebScanner"
         self.query_one("#map").border_title = "server location"
         self.query_one("#status", VerticalScroll).border_title = "Server"
+        self.query_one("#activity", ActivityLog).border_title = "Activity Log"
         self.query_one("#tabs", TabBar).set_selected(self.selected)
         self._update_main_title()
         self._set_keybar(editing=False)
@@ -211,6 +219,7 @@ class WebScannerApp(App):
         self.completed = 0
         self.failed = 0
         self._scanning = True
+        self._scan_start = time.monotonic()
         self._tree_result = None
 
         tabs = self.query_one("#tabs", TabBar)
@@ -220,6 +229,9 @@ class WebScannerApp(App):
         self._set_main_loading(True)
         self.query_one("#map", MapPanel).show_loading()
         self.query_one("#status-content", StatusPanel).show_loading(self.ctx)
+        log = self.query_one("#activity", ActivityLog)
+        log.clear()
+        log.add(activity.started(self.ctx.domain, len(self.modules)))
         self._update_progress()
 
         # Blur the input so single-key nav (←/→, q, r) reaches the app rather
@@ -244,6 +256,9 @@ class WebScannerApp(App):
 
     def on_scan_progress(self, message: ScanProgress) -> None:
         event = message.event
+        # Above the early returns below — the log wants prefetch events too.
+        if (line := activity.summarize(event, self.ctx)) is not None:
+            self.query_one("#activity", ActivityLog).add(line)
         if event.name == PREFETCH:
             if event.status is ModuleStatus.DONE and self.ctx is not None:
                 self.query_one("#map", MapPanel).set_geo(self.ctx.geo)
@@ -275,6 +290,11 @@ class WebScannerApp(App):
     def on_scan_finished(self, message: ScanFinished) -> None:
         self._scanning = False
         total = len(self.modules)
+        self.query_one("#activity", ActivityLog).add(
+            activity.overall(
+                self.completed, self.failed, total, time.monotonic() - self._scan_start
+            )
+        )
         self.query_one("#progress", Static).update(f"done · {total}/{total}")
 
     # ---- progress line ----------------------------------------------------

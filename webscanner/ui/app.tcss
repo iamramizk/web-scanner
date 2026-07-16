@@ -73,9 +73,18 @@ Tab.-selected {
     height: 1fr;   /* fill remaining screen so 1fr rows split equally */
 }
 
-#main {
+/* Left column: the data table over the fixed activity log. A bare wrapper (no
+   border/padding of its own) so the grid still sees one cell here. */
+#left {
     row-span: 2;
     height: 100%;
+}
+
+#main {
+    height: 4fr;   /* 80% of the left column (activity takes the other 20%). Must
+                      stay fr, NOT 100%: that claims the whole column and silently
+                      clips #activity (Vertical is overflow: hidden, so no
+                      scrollbar, no error — the panel just never appears). */
     border: round $primary;
     padding: 0 1;
     scrollbar-size: 0 0;   /* keep wheel/key scroll, hide the bar */
@@ -122,6 +131,22 @@ Tab.-selected {
     link-style-hover: not underline;
     link-color-hover: $text;
     link-background-hover: transparent;
+}
+
+/* Activity log: 20% of the left column, so it grows with the terminal (#main is
+   the other 80%). 4 rows of that go to the border + padding (box-sizing is
+   border-box), so visible lines = height - 4: ~3 at 44 rows, ~6 at 60.
+   min-height floors it at one readable line on a short terminal, where 20% would
+   otherwise round down to nothing but chrome.
+   background: transparent overrides RichLog's $surface, which would punch an
+   opaque block through the ansi_default bg. */
+#activity {
+    height: 1fr;
+    min-height: 5;
+    border: round $primary;
+    padding: 1 1;
+    background: transparent;
+    scrollbar-size: 0 0;
 }
 
 #map {

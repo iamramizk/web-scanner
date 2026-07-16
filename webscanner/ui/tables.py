@@ -139,6 +139,16 @@ def _stringify(value: Any) -> str:
     return str(value)
 
 
+def _plain(value: Any) -> str:
+    """Stringify and strip rich markup (e.g. ``[green]Yes[/]`` -> ``Yes``).
+
+    Shared with export (CSV cells) and activity (log counts) — both need the plain
+    text behind a module's colour markup.
+    """
+    s = _stringify(value)
+    return Text.from_markup(s).plain if "[/]" in s else s
+
+
 def _label(key: Any, mode: str = "upper") -> str:
     """Format a dict key as a column label. ``mode``: ``"upper"`` (ALL CAPS),
     ``"smart"`` (Title Case, acronyms kept upper), or ``"raw"`` (separators

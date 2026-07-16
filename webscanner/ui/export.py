@@ -13,10 +13,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
 
-from rich.text import Text
-
 from ..core.models import Grid, ModuleStatus, Sections, TreeNode
-from .tables import TAB_HEADERS, _SMART_LABEL_TABS, _label
+from .tables import TAB_HEADERS, _SMART_LABEL_TABS, _label, _plain
 
 def _output_base() -> Path:
     """Parent directory for the ``<domain>_<ts>/`` scan folder.
@@ -32,22 +30,6 @@ def _output_base() -> Path:
     if (cwd / "pyproject.toml").is_file() and (cwd / "webscanner" / "__init__.py").is_file():
         return cwd / "output"
     return cwd
-
-
-def _stringify(value: Any) -> str:
-    if isinstance(value, (list, tuple, set)):
-        return "\n".join(str(v) for v in value) if value else "-"
-    if isinstance(value, bool):
-        return "yes" if value else "no"
-    if value is None:
-        return "-"
-    return str(value)
-
-
-def _plain(value: Any) -> str:
-    """Stringify and strip rich markup (e.g. ``[green]Yes[/]`` -> ``Yes``)."""
-    s = _stringify(value)
-    return Text.from_markup(s).plain if "[/]" in s else s
 
 
 def _is_pairs(data: Any) -> bool:

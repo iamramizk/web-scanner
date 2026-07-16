@@ -18,6 +18,11 @@ from ..core.models import Section, Sections
 
 _SKIP_PREFIXES = ("#", "javascript:", "mailto:", "tel:", "data:")
 
+# Placeholder row shown when a section found nothing. Named so callers can tell
+# "no links" from "one link" — the section is never empty, so len() can't.
+EMPTY_INTERNAL = ("—", "no internal links found")
+EMPTY_EXTERNAL = ("—", "no external links found")
+
 
 class LinksModule(ScanModule):
     name = "links"
@@ -31,8 +36,8 @@ class LinksModule(ScanModule):
             internal, external = await asyncio.to_thread(self._parse, ctx)
 
         return Sections([
-            Section("Internal", internal or [("—", "no internal links found")], ("Link text", "URL")),
-            Section("External", external or [("—", "no external links found")], ("Link text", "URL")),
+            Section("Internal", internal or [EMPTY_INTERNAL], ("Link text", "URL")),
+            Section("External", external or [EMPTY_EXTERNAL], ("Link text", "URL")),
         ])
 
     @staticmethod
