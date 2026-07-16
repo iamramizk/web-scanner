@@ -295,7 +295,7 @@ class WebScannerApp(App):
                 self.completed, self.failed, total, time.monotonic() - self._scan_start
             )
         )
-        self.query_one("#progress", Static).update(f"done · {total}/{total}")
+        self.query_one("#progress", Static).update("")
 
     # ---- progress line ----------------------------------------------------
 
