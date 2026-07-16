@@ -121,6 +121,13 @@ Tab.-selected {
     color: $primary;
     text-style: bold;
 }
+/* The expand/collapse chevron. Not a stock Textual component class — SitemapTree
+   adds it and paints the icon span itself, because Textual renders the chevron in
+   the widget's base style, which no CSS can reach without dragging the labels
+   along. White lifts it clear of the labels (ANSI default fg, ~#c5c8c6). */
+#main-tree > .tree--toggle {
+    color: white;
+}
 /* Leaf pages are @click links (click to open the URL). Neutralise Textual's default
    link styling so they render EXACTLY like plain leaf text — no underline, no hover
    colour/background change. */

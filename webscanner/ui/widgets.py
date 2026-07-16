@@ -208,6 +208,12 @@ class SitemapTree(Tree):
         Binding("space", "toggle_all", "Expand/collapse all", show=False),
     ]
 
+    #: Textual gives the expand/collapse chevron no component class of its own — it
+    #: renders with the widget's base style, so plain CSS can't reach it without
+    #: recolouring every label too. Adding one here (Textual unions COMPONENT_CLASSES
+    #: across the MRO) lets `#main-tree > .tree--toggle` in app.tcss style it alone.
+    COMPONENT_CLASSES = {"tree--toggle"}
+
     def __init__(self, **kwargs) -> None:
         super().__init__("/", **kwargs)
         self.show_root = True
@@ -235,6 +241,30 @@ class SitemapTree(Tree):
             parent.add_leaf(f"[@click=open_leaf({index})]{escape(data.label)}[/]")
         else:
             parent.add_leaf(data.label)  # e.g. the "… (truncated)" note — not a link
+
+    def render_label(self, node, base_style, style) -> Text:
+        """Paint the chevron with ``tree--toggle``, leaving the label untouched.
+
+        Textual builds the line as ``ICON + label``, styling the icon with the
+        widget's own base style; re-styling that span is the only way to colour the
+        chevron independently. The icon is a fixed-width prefix (``"▼ "``/``"▶ "``)
+        present only on expandable nodes, so the span is the first ``len(ICON_NODE)``
+        cells. A partial style layers over the base, so only the colour changes.
+
+        The ``_component_styles`` guard is required, not defensive: this also runs
+        pre-mount via ``get_label_width`` (a reactive in ``__init__`` rebuilds the
+        tree lines), and component styles don't exist until the stylesheet is applied
+        on mount — asking for one before that raises ``KeyError``. That early call
+        only measures, and a colour never changes cell width, so skipping is safe.
+        """
+        label = super().render_label(node, base_style, style)
+        if node.allow_expand and "tree--toggle" in self._component_styles:
+            label.stylize(
+                self.get_component_rich_style("tree--toggle", partial=True),
+                0,
+                len(self.ICON_NODE),
+            )
+        return label
 
     def action_open_leaf(self, index: int) -> None:
         if 0 <= index < len(self._leaf_urls):
