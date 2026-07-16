@@ -12,6 +12,9 @@ live as each module completes.
 
 from __future__ import annotations
 
+import re
+
+from bs4 import BeautifulSoup
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
@@ -44,6 +47,73 @@ def _cms_from_tech(data: object) -> tuple[str, str | None] | None:
             if "CMS" in [c.strip() for c in str(categories).split(",")]:
                 return name, (version if version and version != "-" else None)
     return None
+
+
+#: matches a ``<meta name="generator">`` name attribute — real pages ship
+#: ``name="Generator"`` as often as lowercase, so the value is matched case-insensitively
+_GENERATOR_ATTR = re.compile(r"^\s*generator\s*$", re.I)
+
+
+def _split_generator(content: str) -> tuple[str, str | None]:
+    """Split a ``<meta name="generator">`` content value into (name, version|None).
+
+    The version is the first token that contains a digit, plus everything after it
+    ("Sitefinity 14.4.8152.0 DX" → ``("Sitefinity", "14.4.8152.0 DX")``); a value with
+    no such token is all name ("Webflow" → ``("Webflow", None)``). A leading digit-ish
+    token is part of the name, not a version ("1C-Bitrix", "TYPO3 CMS"). Trailing
+    parentheticals are dropped ("Drupal 10 (https://www.drupal.org)" → "Drupal", "10").
+    """
+    content = re.sub(r"\s*\([^)]*\)", "", content).strip()
+    tokens = content.split()
+    for i, token in enumerate(tokens):
+        if i and any(char.isdigit() for char in token):
+            return " ".join(tokens[:i]), " ".join(tokens[i:])
+    return content, None
+
+
+def _generators(html: str | None) -> list[tuple[str, str | None]]:
+    """Every ``<meta name="generator">`` in the page, as (name, version|None) pairs."""
+    if not html:
+        return []
+    soup = BeautifulSoup(html, "html.parser")
+    found = []
+    for tag in soup.find_all("meta", attrs={"name": _GENERATOR_ATTR}):
+        content = (tag.get("content") or "").strip()
+        if content:
+            found.append(_split_generator(content))
+    return found
+
+
+def _same_cms(left: str, right: str) -> bool:
+    """Do two CMS names refer to the same product? Compared on letters/digits only,
+    either containing the other, so "Wix" matches "Wix.com Website Builder"."""
+    left, right = (re.sub(r"[^a-z0-9]", "", name.lower()) for name in (left, right))
+    return bool(left and right) and (left in right or right in left)
+
+
+def _detect_cms(tech_data: object, html: str | None) -> tuple[str, str | None] | None:
+    """The CMS (name, version) for the Server panel, or ``None`` if nothing detected.
+
+    Wappalyzer's ``CMS`` category is the primary signal — it's curated, so it won't
+    mistake a page builder or analytics tag for the CMS. The ``<meta name="generator">``
+    tag covers the two cases it misses: a CMS Wappalyzer has no fingerprint for (e.g.
+    Sitefinity, Webflow) → the generator is used outright; and a CMS it detects but
+    can't version → the generator supplies the version, but only when it names the
+    *same* product, so an "Elementor 3.x" generator can't hijack a "WordPress" hit.
+    """
+    tech = _cms_from_tech(tech_data)
+    generators = _generators(html)
+    if tech is None:
+        # Nothing in the tech stack — fall back to the generator, preferring a
+        # versioned one when the page carries several.
+        versioned = next((gen for gen in generators if gen[1]), None)
+        return versioned or (generators[0] if generators else None)
+    name, version = tech
+    if version is None:
+        for gen_name, gen_version in generators:
+            if gen_version and _same_cms(name, gen_name):
+                return name, gen_version
+    return tech
 
 
 class ScanProgress(Message):
@@ -193,9 +263,12 @@ class WebScannerApp(App):
             self.results[event.name] = event.result
         if event.name == self.selected:
             self._refresh_main()
-        if event.name == "tech" and self.ctx is not None and event.result is not None:
+        if event.name == "tech" and self.ctx is not None:
+            # No result guard: a failed Tech scan can still surface a CMS via the
+            # page's <meta name="generator">.
+            data = event.result.data if event.result is not None else None
             self.query_one("#status-content", StatusPanel).set_ctx(
-                self.ctx, cms=_cms_from_tech(event.result.data)
+                self.ctx, cms=_detect_cms(data, self.ctx.html)
             )
         self._update_progress()
 
