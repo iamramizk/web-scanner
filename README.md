@@ -64,6 +64,13 @@ Alongside the tabs, three fixed panels:
 - **Server** — online status and response time, the final URL after redirects, IP,
   geolocation, ISP, AS, hosting provider and detected CMS (name and version).
 
+Requests to the site being scanned wear a **coherent desktop-Chrome identity** — a real
+User-Agent plus the headers Chrome actually sends beside it — picked once per scan and
+reused for every request, and reported in the Activity Log. This is about getting the real
+page back rather than a WAF block page, and it only defeats naive User-Agent filtering: the
+TLS and HTTP/2 fingerprints are still those of `requests`, so enterprise bot management sees
+straight through it. Third-party lookups (ip-api, DoH) keep an honest scanner User-Agent.
+
 ## Installation
 
 Requires Python 3.11+.
