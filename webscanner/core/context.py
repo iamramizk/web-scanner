@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlparse
 
 from .. import helpers
 from ..net.agents import Profile, random_profile
@@ -41,6 +42,30 @@ class ScanContext:
     def from_target(cls, target: str) -> "ScanContext":
         domain, url = helpers.normalise(target)
         return cls(domain=domain, url=url)
+
+    @property
+    def base(self) -> str:
+        """Origin to build target URLs from: ``<scheme>://<domain>``.
+
+        The scheme is the one prefetch actually *reached*, not the one we asked for.
+        ``helpers.normalise()`` always hands us ``https://`` regardless of what the
+        user typed, so :attr:`url` is not a scheme signal; ``http.fetch()`` retries
+        over ``http://`` when https won't connect, and :attr:`final_url` records
+        where it landed. An http-only site that builds its URLs from :attr:`url`
+        silently gets nothing back (no robots.txt, no sitemap, no tech) while the
+        rest of the scan succeeds.
+
+        The host comes from :attr:`domain`, *not* from ``final_url``: a bare→www
+        redirect would otherwise pin us to ``www.example.com``, and requests we
+        build follow redirects there anyway.
+
+        **Only valid after prefetch.** Before it (``final_url`` is None) this falls
+        back to https — which is also the right answer when the fetch failed
+        outright, since nothing else will connect either. ``prefetch()`` itself must
+        never read this: it is what determines the scheme.
+        """
+        scheme = urlparse(self.final_url).scheme if self.final_url else ""
+        return f"{scheme or 'https'}://{self.domain}"
 
     @property
     def online(self) -> bool:

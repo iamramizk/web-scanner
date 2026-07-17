@@ -48,18 +48,18 @@ class SitemapModule(ScanModule):
     # ---- build (blocking; runs in a thread) -------------------------------
 
     def _build(self, ctx: ScanContext) -> TreeNode | None:
-        urls = self._collect(ctx.domain, ctx.profile)
+        urls = self._collect(ctx.base, ctx.profile)
         if not urls:
             return None  # -> EMPTY
         truncated = len(urls) >= MAX_URLS
         return _url_tree(urls, truncated)
 
-    def _collect(self, domain: str, profile: Profile) -> list[str]:
+    def _collect(self, base: str, profile: Profile) -> list[str]:
         """Fetch every sitemap (recursing indexes) and return the page URLs found."""
         visited: set[str] = set()
         urls: list[str] = []
         budget = [MAX_SITEMAPS]  # mutable counter shared across the recursion
-        for sitemap in self._discover(domain, profile):
+        for sitemap in self._discover(base, profile):
             self._crawl(sitemap, profile, visited, urls, budget, depth=0)
             if len(urls) >= MAX_URLS:
                 break
@@ -92,18 +92,17 @@ class SitemapModule(ScanModule):
 
     # ---- discovery + fetch ------------------------------------------------
 
-    def _discover(self, domain: str, profile: Profile) -> list[str]:
+    def _discover(self, base: str, profile: Profile) -> list[str]:
         """Sitemap URLs from robots.txt, else the two conventional defaults."""
-        urls = self._robots_sitemaps(domain, profile)
+        urls = self._robots_sitemaps(base, profile)
         if not urls:
-            base = f"https://{domain}"
             urls = [f"{base}/sitemap.xml", f"{base}/sitemap_index.xml"]
         seen: set[str] = set()
         return [u for u in urls if not (u in seen or seen.add(u))]
 
     @staticmethod
-    def _robots_sitemaps(domain: str, profile: Profile) -> list[str]:
-        url = f"https://{domain}/robots.txt"
+    def _robots_sitemaps(base: str, profile: Profile) -> list[str]:
+        url = f"{base}/robots.txt"
         try:
             resp = requests.get(
                 url,

@@ -104,7 +104,7 @@ class SeoModule(ScanModule):
     label = "SEO"
 
     async def run(self, ctx: ScanContext) -> Sections:
-        robots_coro = asyncio.to_thread(self._fetch_robots, ctx.domain, ctx.profile)
+        robots_coro = asyncio.to_thread(self._fetch_robots, ctx.base, ctx.profile)
         if not ctx.html:
             robots = await robots_coro
             note = {"note": "no page content"}
@@ -170,8 +170,8 @@ class SeoModule(ScanModule):
         return schema, content, keywords
 
     @staticmethod
-    def _fetch_robots(domain: str, profile: Profile) -> dict[str, object]:
-        url = f"https://{domain}/robots.txt"
+    def _fetch_robots(base: str, profile: Profile) -> dict[str, object]:
+        url = f"{base}/robots.txt"
         try:
             resp = requests.get(
                 url,

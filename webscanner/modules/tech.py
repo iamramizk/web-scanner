@@ -93,8 +93,12 @@ class TechModule(ScanModule):
         _wear_profile(ctx.profile)
 
         def detect() -> Sections:
-            results = analyze(url=ctx.url, scan_type="fast", timeout=30)
-            techs = results.get(ctx.url) or next(iter(results.values()), {})
+            # ctx.base, not ctx.url: Wappalyzer fetches the page itself, so on an
+            # http-only site an https:// url hands it a connection error and the tab
+            # comes back empty. It also keeps what Wappalyzer sees in step with the
+            # ctx.html that seo/links/the CMS generator path already read.
+            results = analyze(url=ctx.base, scan_type="fast", timeout=30)
+            techs = results.get(ctx.base) or next(iter(results.values()), {})
             # group name -> rows; a tech lands in every group it declares
             groups: dict[str, list[list[str]]] = {}
             for name, info in techs.items():

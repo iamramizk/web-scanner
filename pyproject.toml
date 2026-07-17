@@ -32,6 +32,11 @@ dependencies = [
     "beautifulsoup4>=4.12.2",
 ]
 
+[project.optional-dependencies]
+# Test-only; not a runtime dep, so requirements.txt does not mirror it.
+# pip install -e ".[test]" && python -m pytest
+test = ["pytest>=8.0"]
+
 [project.urls]
 Homepage = "https://github.com/iamramizk/web-scanner"
 Repository = "https://github.com/iamramizk/web-scanner"
