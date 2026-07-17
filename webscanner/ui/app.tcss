@@ -81,7 +81,7 @@ Tab.-selected {
 }
 
 #main {
-    height: 4fr;   /* 80% of the left column (activity takes the other 20%). Must
+    height: 3fr;   /* 75% of the left column (activity takes the other 25%). Must
                       stay fr, NOT 100%: that claims the whole column and silently
                       clips #activity (Vertical is overflow: hidden, so no
                       scrollbar, no error — the panel just never appears). */
@@ -140,10 +140,12 @@ Tab.-selected {
     link-background-hover: transparent;
 }
 
-/* Activity log: 20% of the left column, so it grows with the terminal (#main is
-   the other 80%). 4 rows of that go to the border + padding (box-sizing is
-   border-box), so visible lines = height - 4: ~3 at 44 rows, ~6 at 60.
-   min-height floors it at one readable line on a short terminal, where 20% would
+/* Activity log: 25% of the left column, so it grows with the terminal (#main is
+   the other 75%). 4 rows of that go to the border + padding (box-sizing is
+   border-box), so visible lines = height - 4: 5 at 44 rows, 9 at 60, 14 at 80
+   (measured, not derived — heights are whole cells, and Textual hands the rounding
+   remainder to the last child).
+   min-height floors it at one readable line on a short terminal, where 25% would
    otherwise round down to nothing but chrome.
    background: transparent overrides RichLog's $surface, which would punch an
    opaque block through the ansi_default bg. */
