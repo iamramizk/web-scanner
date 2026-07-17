@@ -273,6 +273,19 @@ def started(target: str, count: int) -> str:
     return f"Scan: Started {_esc(target)} · {_plural(count, 'module')}."
 
 
+def cms(detected: tuple[str, str | None] | None) -> str:
+    """The Server panel's CMS row, as a log line — wording kept identical to it.
+
+    Not a module: the UI derives this from the Tech result plus the page's
+    ``<meta name="generator">``, so ``app.py`` calls this straight after the Tech
+    event and the line lands directly under Tech's.
+    """
+    if detected is None:
+        return "CMS: Not detected."
+    name, version = detected
+    return f"CMS: {_esc(f'{name} {version}' if version else name)}."
+
+
 def overall(completed: int, failed: int, total: int, seconds: float) -> str:
     """The closing line. ``seconds`` is wall-clock for the whole scan — modules run
     concurrently, so summing their durations would overstate it several-fold."""

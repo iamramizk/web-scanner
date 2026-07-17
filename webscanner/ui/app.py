@@ -282,9 +282,9 @@ class WebScannerApp(App):
             # No result guard: a failed Tech scan can still surface a CMS via the
             # page's <meta name="generator">.
             data = event.result.data if event.result is not None else None
-            self.query_one("#status-content", StatusPanel).set_ctx(
-                self.ctx, cms=_detect_cms(data, self.ctx.html)
-            )
+            detected = _detect_cms(data, self.ctx.html)
+            self.query_one("#status-content", StatusPanel).set_ctx(self.ctx, cms=detected)
+            self.query_one("#activity", ActivityLog).add(activity.cms(detected))
         self._update_progress()
 
     def on_scan_finished(self, message: ScanFinished) -> None:
