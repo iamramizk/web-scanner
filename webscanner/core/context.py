@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .. import helpers
+from ..net.agents import Profile, random_profile
 
 
 @dataclass
@@ -18,6 +19,11 @@ class ScanContext:
     # inputs
     domain: str  # bare host, e.g. "example.com"
     url: str  # full url, e.g. "https://example.com"
+
+    #: The browser identity every target-facing request wears. Chosen once per scan
+    #: and shared, so the site sees one consistent visitor rather than a different
+    #: browser per request — see net/agents.py. Not used for ip-api/DoH.
+    profile: Profile = field(default_factory=random_profile)
 
     # shared prefetch results (filled by AsyncScanner.prefetch)
     ip: str | None = None

@@ -27,7 +27,8 @@ import requests
 from ..core.module import ScanModule
 from ..core.context import ScanContext
 from ..core.models import TreeNode
-from ..net.http import DEFAULT_HEADERS, TIMEOUT
+from ..net.agents import Profile
+from ..net.http import TIMEOUT
 
 #: total sitemap files fetched across the whole tree (loop / fan-out guard)
 MAX_SITEMAPS = 60
@@ -47,37 +48,40 @@ class SitemapModule(ScanModule):
     # ---- build (blocking; runs in a thread) -------------------------------
 
     def _build(self, ctx: ScanContext) -> TreeNode | None:
-        urls = self._collect(ctx.domain)
+        urls = self._collect(ctx.domain, ctx.profile)
         if not urls:
             return None  # -> EMPTY
         truncated = len(urls) >= MAX_URLS
         return _url_tree(urls, truncated)
 
-    def _collect(self, domain: str) -> list[str]:
+    def _collect(self, domain: str, profile: Profile) -> list[str]:
         """Fetch every sitemap (recursing indexes) and return the page URLs found."""
         visited: set[str] = set()
         urls: list[str] = []
         budget = [MAX_SITEMAPS]  # mutable counter shared across the recursion
-        for sitemap in self._discover(domain):
-            self._crawl(sitemap, visited, urls, budget, depth=0)
+        for sitemap in self._discover(domain, profile):
+            self._crawl(sitemap, profile, visited, urls, budget, depth=0)
             if len(urls) >= MAX_URLS:
                 break
         seen: set[str] = set()  # dedupe, preserve order
         return [u for u in urls if not (u in seen or seen.add(u))]
 
-    def _crawl(self, url: str, visited: set[str], urls: list[str], budget: list[int], depth: int) -> None:
+    def _crawl(
+        self, url: str, profile: Profile, visited: set[str], urls: list[str],
+        budget: list[int], depth: int,
+    ) -> None:
         if url in visited or budget[0] <= 0 or depth > MAX_DEPTH or len(urls) >= MAX_URLS:
             return
         visited.add(url)
         budget[0] -= 1
 
-        raw = self._get(url)
+        raw = self._get(url, profile)
         if raw is None:
             return
         kind, locs = _parse_sitemap(raw)
         if kind == "index":
             for loc in locs:
-                self._crawl(loc, visited, urls, budget, depth + 1)
+                self._crawl(loc, profile, visited, urls, budget, depth + 1)
                 if len(urls) >= MAX_URLS:
                     return
         elif kind == "urlset":
@@ -88,9 +92,9 @@ class SitemapModule(ScanModule):
 
     # ---- discovery + fetch ------------------------------------------------
 
-    def _discover(self, domain: str) -> list[str]:
+    def _discover(self, domain: str, profile: Profile) -> list[str]:
         """Sitemap URLs from robots.txt, else the two conventional defaults."""
-        urls = self._robots_sitemaps(domain)
+        urls = self._robots_sitemaps(domain, profile)
         if not urls:
             base = f"https://{domain}"
             urls = [f"{base}/sitemap.xml", f"{base}/sitemap_index.xml"]
@@ -98,11 +102,12 @@ class SitemapModule(ScanModule):
         return [u for u in urls if not (u in seen or seen.add(u))]
 
     @staticmethod
-    def _robots_sitemaps(domain: str) -> list[str]:
+    def _robots_sitemaps(domain: str, profile: Profile) -> list[str]:
+        url = f"https://{domain}/robots.txt"
         try:
             resp = requests.get(
-                f"https://{domain}/robots.txt",
-                headers=DEFAULT_HEADERS, timeout=TIMEOUT, allow_redirects=True,
+                url,
+                headers=profile.headers(url), timeout=TIMEOUT, allow_redirects=True,
             )
             if resp.status_code != 200:
                 return []
@@ -115,10 +120,12 @@ class SitemapModule(ScanModule):
             return []
 
     @staticmethod
-    def _get(url: str) -> bytes | None:
+    def _get(url: str, profile: Profile) -> bytes | None:
         """Fetch a sitemap; gunzip ``.xml.gz`` / gzip payloads by magic bytes."""
         try:
-            resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=TIMEOUT, allow_redirects=True)
+            resp = requests.get(
+                url, headers=profile.headers(url), timeout=TIMEOUT, allow_redirects=True
+            )
             if resp.status_code != 200:
                 return None
             raw = resp.content

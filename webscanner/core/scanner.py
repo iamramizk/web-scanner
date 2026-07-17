@@ -56,7 +56,7 @@ class AsyncScanner:
 
         async def _fetch() -> None:
             try:
-                r = await asyncio.to_thread(http.fetch, self.ctx.url)
+                r = await asyncio.to_thread(http.fetch, self.ctx.url, self.ctx.profile)
                 self.ctx.status_code = r["status_code"]
                 self.ctx.headers = r["headers"]
                 self.ctx.html = r["html"]

@@ -232,6 +232,7 @@ class WebScannerApp(App):
         log = self.query_one("#activity", ActivityLog)
         log.clear()
         log.add(activity.started(self.ctx.domain, len(self.modules)))
+        log.add(activity.agent(self.ctx.profile))
         self._update_progress()
 
         # Blur the input so single-key nav (←/→, q, r) reaches the app rather

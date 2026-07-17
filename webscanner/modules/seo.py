@@ -26,7 +26,8 @@ from ..colors import GREEN, RED, MUTED
 from ..core.module import ScanModule
 from ..core.context import ScanContext
 from ..core.models import Section, Sections
-from ..net.http import DEFAULT_HEADERS, TIMEOUT
+from ..net.agents import Profile
+from ..net.http import TIMEOUT
 
 TITLE_RANGE = (30, 60)
 DESC_RANGE = (70, 160)
@@ -103,7 +104,7 @@ class SeoModule(ScanModule):
     label = "SEO"
 
     async def run(self, ctx: ScanContext) -> Sections:
-        robots_coro = asyncio.to_thread(self._fetch_robots, ctx.domain)
+        robots_coro = asyncio.to_thread(self._fetch_robots, ctx.domain, ctx.profile)
         if not ctx.html:
             robots = await robots_coro
             note = {"note": "no page content"}
@@ -169,11 +170,12 @@ class SeoModule(ScanModule):
         return schema, content, keywords
 
     @staticmethod
-    def _fetch_robots(domain: str) -> dict[str, object]:
+    def _fetch_robots(domain: str, profile: Profile) -> dict[str, object]:
+        url = f"https://{domain}/robots.txt"
         try:
             resp = requests.get(
-                f"https://{domain}/robots.txt",
-                headers=DEFAULT_HEADERS, timeout=TIMEOUT, allow_redirects=True,
+                url,
+                headers=profile.headers(url), timeout=TIMEOUT, allow_redirects=True,
             )
             text = resp.text.strip()
             ctype = resp.headers.get("content-type", "").lower()

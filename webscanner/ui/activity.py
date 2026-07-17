@@ -31,6 +31,7 @@ from ..colors import GREEN, RED
 from ..core.context import ScanContext
 from ..core.models import ModuleResult, ModuleStatus, ScanEvent
 from ..core.scanner import PREFETCH
+from ..net.agents import Profile
 from ..modules import all_modules
 from ..modules.dns import RECORD_TYPES
 from ..modules.links import EMPTY_EXTERNAL, EMPTY_INTERNAL
@@ -271,6 +272,18 @@ _SUMMARIZERS: dict[str, Callable[[ModuleResult], str]] = {
 def started(target: str, count: int) -> str:
     """The opening line."""
     return f"Scan: Started {_esc(target)} · {_plural(count, 'module')}."
+
+
+def agent(profile: Profile) -> str:
+    """The browser identity this scan wore.
+
+    Worth a line because the profile is chosen at random per scan: when a scan returns
+    something surprising (a block page, a tech list that shifted since last run), the
+    first question is what the site thought we were, and the answer differs run to run.
+    The label — "Chrome 151 · Windows" — is enough to reproduce it; the full UA string
+    is ~110 chars and would be ellipsised to no benefit.
+    """
+    return f"Agent: {_esc(profile.label)}."
 
 
 def cms(detected: tuple[str, str | None] | None) -> str:

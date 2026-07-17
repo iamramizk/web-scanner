@@ -1,8 +1,21 @@
 """Blocking HTTP / DNS / TLS primitives.
 
 Kept synchronous on purpose: the async core calls these via ``asyncio.to_thread``.
-Centralising them here gives every module one user-agent, one timeout policy and
-one place to add retries/proxying later.
+Centralising them here gives every module one timeout policy and one place to add
+retries/proxying later.
+
+Two identities live here, and the split is deliberate:
+
+* **Target-facing** requests (homepage, robots.txt, sitemaps) wear the scan's
+  :class:`~webscanner.net.agents.Profile` — a browser identity, passed in by the
+  caller from ``ctx.profile``. See ``agents.py`` for why.
+* **Third-party APIs** (ip-api, Cloudflare DoH) use :data:`API_HEADERS`, which
+  identifies the tool honestly. They don't block and don't care, and there's no
+  reason to wear a costume for a free service we depend on.
+
+``API_HEADERS`` is named for that job rather than "default" on purpose: there is no
+sensible default here, and a name like ``DEFAULT_HEADERS`` is exactly what someone
+reaches for by accident on a target request.
 """
 
 from __future__ import annotations
@@ -15,14 +28,16 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
+from .agents import Profile
 from .psl import registrable_domain
 
 USER_AGENT = "web-scanner/2.0 (+https://github.com/iamramizk/web-scanner)"
 TIMEOUT = 12
-DEFAULT_HEADERS = {"User-Agent": USER_AGENT}
+#: For third-party APIs only — never for the target. See the module docstring.
+API_HEADERS = {"User-Agent": USER_AGENT}
 
 
-def fetch(url: str) -> dict[str, Any]:
+def fetch(url: str, profile: Profile) -> dict[str, Any]:
     """GET a URL, following redirects; return status/headers/body/timing/final-url.
 
     ``redirect`` is set (e.g. "301 Moved Permanently") only when a redirect crossed
@@ -36,16 +51,18 @@ def fetch(url: str) -> dict[str, Any]:
     is a normal response, not a connection failure, and does not trigger a retry.
     """
     try:
-        return _get(url)
+        return _get(url, profile)
     except requests.exceptions.RequestException:
         if url.lower().startswith("https://"):
-            return _get("http://" + url[len("https://"):])
+            return _get("http://" + url[len("https://"):], profile)
         raise
 
 
-def _get(url: str) -> dict[str, Any]:
+def _get(url: str, profile: Profile) -> dict[str, Any]:
     start = time.perf_counter()
-    resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=TIMEOUT, allow_redirects=True)
+    # headers(url), not a cached dict: the http:// retry above must drop the client
+    # hints, which are https-only.
+    resp = requests.get(url, headers=profile.headers(url), timeout=TIMEOUT, allow_redirects=True)
     elapsed = (time.perf_counter() - start) * 1000
 
     orig = registrable_domain(urlparse(url).hostname)
@@ -76,7 +93,7 @@ def resolve_ip(domain: str) -> str | None:
 
 def get_geo(ip: str) -> dict[str, Any]:
     """Geolocate an IP via ip-api.com (free, no key)."""
-    resp = requests.get(f"http://ip-api.com/json/{ip}", headers=DEFAULT_HEADERS, timeout=TIMEOUT)
+    resp = requests.get(f"http://ip-api.com/json/{ip}", headers=API_HEADERS, timeout=TIMEOUT)
     return resp.json()
 
 
