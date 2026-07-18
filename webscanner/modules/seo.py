@@ -39,11 +39,38 @@ SOCIAL_DOMAINS = (
 )
 
 _STOPWORDS = frozenset(
-    "the a an and or but if of to in on for with as by at from is are was were be "
-    "been being this that these those it its you your we our us they their he she "
-    "his her not no so do does did has have had can will would should could may "
-    "might just than then there here what which who when where how all any some "
-    "more most other into out up down over under about also new get one two".split()
+    (
+        # core articles / conjunctions / prepositions / pronouns
+        "the a an and or but if of to in on for with as by at from is are was were be "
+        "been being this that these those it its you your we our us they their he she "
+        "his her not no so do does did has have had can will would should could may "
+        "might just than then there here what which who when where how all any some "
+        "more most other into out up down over under about also new get one two "
+        # additional pronouns / possessives
+        "him them myself yourself himself herself itself ourselves themselves "
+        "whom whose mine yours ours hers theirs "
+        # modals / auxiliaries
+        "shall must cannot ought need used "
+        # conjunctions / subordinators
+        "nor yet because while since until unless although though whether whereas "
+        "whenever wherever whoever whatever "
+        # prepositions
+        "off per via upon above below beneath between among amongst throughout during "
+        "before after against without within along across behind beyond near toward "
+        "towards onto "
+        # determiners / quantifiers
+        "each every either neither both few many much such own same only very too quite "
+        "rather enough none another several "
+        # common adverbs / fillers
+        "back even still again ever never always often once now thus hence therefore "
+        "however moreover otherwise indeed perhaps maybe actually really simply almost "
+        "already else yes why well like "
+        # contractions (the tokenizer keeps apostrophes, so these survive verbatim)
+        "don't doesn't didn't isn't aren't wasn't weren't won't wouldn't can't couldn't "
+        "shouldn't hasn't haven't hadn't i'm i've i'll i'd you're you've you'll you'd "
+        "we're we've we'll we'd they're they've they'll it's he's she's that's there's "
+        "here's what's who's let's"
+    ).split()
 )
 
 
