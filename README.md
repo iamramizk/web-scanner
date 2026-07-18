@@ -5,7 +5,7 @@
 _An async Textual TUI for website reconnaissance — DNS, WHOIS, TLS, security, tech-stack and SEO, with no paid APIs._
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/downloads/)
-[![PyPI Downloads](https://img.shields.io/pypi/dm/web-scanner?style=for-the-badge&logo=pypi&logoColor=white&color=006DAD)](https://pypi.org/project/web-scanner/)
+[![PyPI Downloads](https://img.shields.io/pepy/dt/web-scanner?style=for-the-badge&logo=pypi&logoColor=white&color=006DAD)](https://pypi.org/project/web-scanner/)
 [![Release](https://img.shields.io/github/v/release/iamramizk/web-scanner?style=for-the-badge&logo=github&color=2EA44F)](https://github.com/iamramizk/web-scanner/releases/latest)
 
 </div>
