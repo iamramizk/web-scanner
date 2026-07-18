@@ -99,6 +99,18 @@ def _len_line(text: str, lo: int, hi: int) -> str:
     return f"[{MUTED}]{escape(text)}[/]\n[{colour}]{n} chars · rec. {lo}-{hi}[/]"
 
 
+def _text(el) -> str:
+    """Element text as the browser's `textContent` sees it, whitespace collapsed.
+
+    `get_text(strip=True)` strips each child text node then joins with no
+    separator, so words split across spans/newlines fuse ("One <span>Two</span>
+    <span>Three</span>" -> "OneTwoThree"). Taking the raw text and re-joining on
+    whitespace keeps the gaps that actually exist between nodes without inventing
+    any where the DOM has none (e.g. `<br>`).
+    """
+    return " ".join(el.get_text().split())
+
+
 class SeoModule(ScanModule):
     name = "seo"
     label = "SEO"
@@ -141,7 +153,7 @@ class SeoModule(ScanModule):
 
         # --- Content ---
         title_el = soup.find("title")
-        title = title_el.get_text(strip=True) if title_el else None
+        title = _text(title_el) if title_el else None
         desc_el = soup.find("meta", attrs={"name": "description"})
         desc = (desc_el.get("content") or "").strip() if desc_el else None
         content: dict[str, object] = {
@@ -149,7 +161,7 @@ class SeoModule(ScanModule):
             "Description": _len_line(desc, *DESC_RANGE) if desc else "-",
         }
         for lvl in range(1, 4):
-            content[f"H{lvl}"] = [h.get_text(strip=True) for h in soup.find_all(f"h{lvl}")]
+            content[f"H{lvl}"] = [_text(h) for h in soup.find_all(f"h{lvl}")]
         content["Socials"] = sorted({
             tag["href"].rstrip("/")
             for tag in soup.find_all("a", href=True)
