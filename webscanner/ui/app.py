@@ -27,7 +27,7 @@ from ..core.scanner import PREFETCH
 from ..modules import all_modules
 from . import activity
 from .export import export_csvs
-from .tables import render_result
+from .tables import UNSET, render_result
 from .widgets import ActivityLog, MapPanel, SitemapTree, StatusPanel, TabBar, Tab
 
 #: width (cells) of the footer progress bar and its dim (incomplete) colour
@@ -166,6 +166,10 @@ class WebScannerApp(App):
         self.ctx: ScanContext | None = None
         self.modules = all_modules()
         self.results: dict = {}
+        # Detected CMS for the Server panel (and its CSV export): UNSET until Tech
+        # completes, then None ("Not detected") or (name, version|None). Mirrors the
+        # value handed to StatusPanel so the export matches what's on screen.
+        self._cms: object = UNSET
         self.selected = self.modules[0].name
         self.completed = 0
         self.failed = 0
@@ -216,6 +220,7 @@ class WebScannerApp(App):
         self.ctx = ScanContext.from_target(target)
         self.modules = all_modules()
         self.results = {}
+        self._cms = UNSET
         self.completed = 0
         self.failed = 0
         self._scanning = True
@@ -284,6 +289,7 @@ class WebScannerApp(App):
             # page's <meta name="generator">.
             data = event.result.data if event.result is not None else None
             detected = _detect_cms(data, self.ctx.html)
+            self._cms = detected
             self.query_one("#status-content", StatusPanel).set_ctx(self.ctx, cms=detected)
             self.query_one("#activity", ActivityLog).add(activity.cms(detected))
         self._update_progress()
@@ -422,7 +428,7 @@ class WebScannerApp(App):
         if self.ctx is None or not self.results:
             self.query_one("#progress", Static).update("[dim]nothing to save yet[/]")
             return
-        folder = export_csvs(self.ctx.domain, self.modules, self.results)
+        folder = export_csvs(self.ctx, self.modules, self.results, cms=self._cms)
         if folder:
             base = folder.parent  # where it saved, minus the domain_<ts> folder name
             names = [p for p in base.parts if p != base.anchor]  # drop the '/' root

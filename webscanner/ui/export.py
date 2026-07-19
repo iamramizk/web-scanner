@@ -4,6 +4,9 @@ Each tab is written with columns that mirror its on-screen table: key/value tabs
 get their ``TAB_HEADERS`` pair, multi-table tabs (Sections) get ``Section, Field,
 Value``, and the Tech ``Grid`` keeps its native columns. Rich colour markup in
 values is stripped so the CSV holds plain text.
+
+The fixed **Server** panel is not a scan module, so it has no tab of its own; it's
+exported separately as ``server.csv`` (Field/Value) via ``_server_rows``.
 """
 
 from __future__ import annotations
@@ -13,8 +16,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterator
 
+from ..core import ScanContext
 from ..core.models import Grid, ModuleStatus, Sections, TreeNode
-from .tables import TAB_HEADERS, _SMART_LABEL_TABS, _label, _plain
+from .tables import TAB_HEADERS, UNSET, _SMART_LABEL_TABS, _label, _plain
 
 def _output_base() -> Path:
     """Parent directory for the ``<domain>_<ts>/`` scan folder.
@@ -103,9 +107,46 @@ def _write_tab(path: Path, name: str, data: Any) -> None:
                 writer.writerow([field, value])
 
 
-def export_csvs(domain: str, modules: list, results: dict) -> Path | None:
-    """Write one CSV per tab that produced data; return the output folder (or None
-    if nothing was written)."""
+def _server_rows(ctx: ScanContext, cms: object = UNSET) -> Iterator[tuple[str, str]]:
+    """Yield the Server panel's (field, value) rows in plain text.
+
+    Mirrors ``tables.render_status`` — the panel is fed from ``ctx`` (+ the detected
+    CMS), not from a scan module, so it has no tab CSV of its own. Rows are emitted
+    under the same conditions as the panel (optional Final URL / Redirected / Host /
+    CMS) so the file matches what's on screen.
+    """
+    geo = ctx.geo or {}
+    if ctx.online:
+        yield "Status", f"online · {ctx.status_code} · {ctx.response_time_ms:.0f}ms"
+    elif ctx.fetch_error is not None:
+        yield "Status", "offline"
+    else:
+        yield "Status", "-"
+    if ctx.final_url:
+        yield "Final URL", ctx.final_url
+    if ctx.redirect_status:
+        yield "Redirected", ctx.redirect_status
+    yield "IP", ctx.ip or "-"
+    if geo:
+        yield "Location", f"{geo.get('city', '-')}, {geo.get('country', '-')}"
+    else:
+        yield "Location", "-"
+    org = geo.get("org")
+    if org and org != geo.get("isp"):
+        yield "Host", org
+    yield "ISP", geo.get("isp") or "-"
+    yield "AS", geo.get("as") or "-"
+    if cms is not UNSET:
+        if cms is None:
+            yield "CMS", "Not detected"
+        else:
+            name, version = cms
+            yield "CMS", f"{name} {version}" if version else name
+
+
+def export_csvs(ctx: ScanContext, modules: list, results: dict, cms: object = UNSET) -> Path | None:
+    """Write one CSV per tab that produced data, plus the Server panel; return the
+    output folder (or None if nothing was written)."""
     tabs = [
         m for m in modules
         if (r := results.get(m.name)) is not None
@@ -115,8 +156,13 @@ def export_csvs(domain: str, modules: list, results: dict) -> Path | None:
     if not tabs:
         return None
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    folder = _output_base() / f"{domain}_{ts}"
+    folder = _output_base() / f"{ctx.domain}_{ts}"
     folder.mkdir(parents=True, exist_ok=True)
     for module in tabs:
         _write_tab(folder / f"{module.name}.csv", module.name, results[module.name].data)
+    with (folder / "server.csv").open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Field", "Value"])
+        for field, value in _server_rows(ctx, cms):
+            writer.writerow([field, value])
     return folder
