@@ -36,16 +36,20 @@ Ten tabs, scanned concurrently and rendered live as each module finishes:
 
 - **DNS** — A / AAAA / NS / CNAME / SOA / MX / TXT / CAA / DS / DNSKEY records, plus email
   authentication folded in: DMARC (`_dmarc`) and DKIM (probes ~40 known selectors, each hit
-  labelled with the email provider it points to, where the selector identifies one).
+  labelled with the email provider it points to, where the selector identifies one). Two
+  derived rows round it out: SPF's `all` qualifier, and an **Email Spoofing** verdict
+  (Protected / Weak / Vulnerable) computed from DMARC enforcement, not SPF alone.
 - **Whois** — parsed system `whois`, with rich gTLD and ccTLD field support (registrar,
   dates, nameservers, per-contact details).
 - **Subdomains** — discovered natively from TLS certificate SANs and `socket` probes of
   common subdomains — no third-party enumeration services.
 - **SSL** — certificate issuer, subject, SANs, validity window, trust and expiry, parsed
   from the live TLS handshake.
-- **Security** — TCP connect port scan, presence of HTTP security headers (CSP, HSTS,
-  X-Frame-Options, …), and blocklist status across public filtering resolvers
-  (AdGuard, CleanBrowsing, Cloudflare, Google, OpenDNS, Quad9).
+- **Security** — WAF detection (passive header/cookie fingerprinting plus an active probe
+  that sends obvious attack payloads to see if it gets blocked, naming vendors like
+  Cloudflare, Sucuri, Akamai, ModSecurity), TCP connect port scan, presence of HTTP
+  security headers (CSP, HSTS, X-Frame-Options, …), and blocklist status across public
+  filtering resolvers (AdGuard, CleanBrowsing, Cloudflare, Google, OpenDNS, Quad9).
 - **Headers** — the full set of HTTP response headers.
 - **Tech** — technology-stack detection via [Wappalyzer](https://github.com/tunetheweb/wappalyzer),
   listing each technology with its category, confidence, groups and version.
