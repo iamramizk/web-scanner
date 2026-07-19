@@ -33,7 +33,7 @@ from ..core.models import ModuleResult, ModuleStatus, ScanEvent
 from ..core.scanner import PREFETCH
 from ..net.agents import Profile
 from ..modules import all_modules
-from ..modules.dns import RECORD_TYPES
+from ..modules.dns import RECORD_TYPES, assess_spoofing
 from ..modules.links import EMPTY_EXTERNAL, EMPTY_INTERNAL
 from ..modules.sitemap import MAX_URLS
 from .tables import _plain
@@ -284,6 +284,23 @@ def agent(profile: Profile) -> str:
     is ~110 chars and would be ellipsised to no benefit.
     """
     return f"Agent: {_esc(profile.label)}."
+
+
+def email_spoofing(result: ModuleResult) -> str:
+    """The DNS module's derived email-spoofing verdict, as its own log line.
+
+    Not a module: like the CMS line, ``app.py`` emits this straight after the DNS event
+    so it lands directly under DNS's line. Recomputed from the DNS result's records via
+    the same ``assess_spoofing`` the tab row uses (one source of truth) — the coloured
+    verb (green Protected / red otherwise) then lands in the same column as every other
+    line's verb. See the DNS module notes for why DMARC, not SPF, decides this.
+    """
+    data = result.data or {}
+    verdict, reason = assess_spoofing(
+        data.get("TXT", []), data.get("DMARC", []), "DKIM" in data
+    )
+    colour = GREEN if verdict.startswith("Protected") else RED
+    return f"Email Spoofing: [{colour}]{verdict}[/]. {_esc(reason)}."
 
 
 def cms(detected: tuple[str, str | None] | None) -> str:

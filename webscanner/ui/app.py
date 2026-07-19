@@ -284,6 +284,11 @@ class WebScannerApp(App):
             self.results[event.name] = event.result
         if event.name == self.selected:
             self._refresh_main()
+        if event.name == "dns" and event.result is not None:
+            # Derived email-spoofing verdict — its own line, right under DNS's summary.
+            self.query_one("#activity", ActivityLog).add(
+                activity.email_spoofing(event.result)
+            )
         if event.name == "tech" and self.ctx is not None:
             # No result guard: a failed Tech scan can still surface a CMS via the
             # page's <meta name="generator">.

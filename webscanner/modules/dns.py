@@ -9,10 +9,12 @@ when found (no "present: yes/no" noise).
 from __future__ import annotations
 
 import asyncio
+import re
 from typing import Any
 
 import pydig
 
+from ..colors import GREEN, RED
 from ..core.module import ScanModule
 from ..core.context import ScanContext
 
@@ -63,6 +65,77 @@ def _is_dkim(records: list[str]) -> bool:
     return any(("dkim1" in r.lower() or "p=" in r.lower()) for r in records)
 
 
+# ---- email-spoofing assessment -------------------------------------------
+#
+# A *configuration* verdict from what DNS already tells us — the same thing MXToolbox /
+# dmarcian report, not a live send test. The load-bearing insight: **DMARC enforcement,
+# not SPF, is what stops visible (From-header) spoofing.** SPF only authenticates the
+# envelope/return-path, so a domain with a perfect `-all` SPF but no DMARC (or `p=none`)
+# is still spoofable in a way the recipient sees. So the verdict keys off DMARC policy,
+# with SPF only breaking the tie when DMARC is absent.
+
+_ALL_MECHANISM = re.compile(r"([~+?-])all\b", re.I)
+_DMARC_TAG = re.compile(r"\b(p|sp|pct)\s*=\s*([^;]+)", re.I)
+
+
+def _spf_qualifier(txt_records: list[str]) -> str | None:
+    """The qualifier of the SPF record's ``all`` mechanism (``-all``/``~all``/``?all``/
+    ``+all``), or ``None`` if there's no ``v=spf1`` record or it carries no ``all``."""
+    for record in txt_records:
+        if record.strip().lower().startswith("v=spf1"):
+            if match := _ALL_MECHANISM.search(record):
+                return f"{match.group(1)}all"
+            return None  # SPF present but no `all` — treat as no explicit policy
+    return None
+
+
+def _dmarc_policy(dmarc_records: list[str]) -> tuple[str | None, int]:
+    """``(policy, pct)`` from the first DMARC record — policy is ``p=`` lower-cased
+    (``reject``/``quarantine``/``none``) or ``None``; ``pct`` defaults to 100."""
+    for record in dmarc_records:
+        tags = {m.group(1).lower(): m.group(2).strip() for m in _DMARC_TAG.finditer(record)}
+        policy = tags.get("p", "").lower() or None
+        try:
+            pct = int(tags.get("pct", "100"))
+        except ValueError:
+            pct = 100
+        return policy, pct
+    return None, 100
+
+
+def assess_spoofing(
+    txt_records: list[str], dmarc_records: list[str], has_dkim: bool
+) -> tuple[str, str]:
+    """``(verdict, reason)`` — verdict is ``Protected`` / ``Weak`` / ``Vulnerable``.
+
+    Pure (no ctx, no I/O) so it's unit-testable like the activity-line catalogue.
+    """
+    spf = _spf_qualifier(txt_records)
+    policy, pct = _dmarc_policy(dmarc_records)
+
+    if policy in ("reject", "quarantine"):
+        if pct < 100:
+            return "Weak", f"DMARC p={policy} but only pct={pct}"
+        label = "Protected" if policy == "reject" else "Protected (quarantine)"
+        return label, f"DMARC p={policy}"
+    if policy == "none":
+        return "Weak", "DMARC p=none — monitoring only, mail still delivered"
+    # No enforcing DMARC — SPF alone can't stop From-header spoofing.
+    if spf == "-all":
+        return "Weak", "SPF -all but no DMARC policy"
+    if spf:
+        return "Vulnerable", f"no DMARC and SPF {spf} (not enforcing)"
+    return "Vulnerable", "no DMARC policy and no SPF record"
+
+
+def _verdict_cell(verdict: str, reason: str) -> str:
+    """Colour the verdict verb (green Protected, else red — Weak and Vulnerable are both
+    spoofable) with the reason kept alongside. A value with ``[/]`` renders via markup in
+    ``_value_cell``."""
+    colour = GREEN if verdict.startswith("Protected") else RED
+    return f"[{colour}]{verdict}[/] — {reason}"
+
+
 class DnsModule(ScanModule):
     name = "dns"
     label = "DNS"
@@ -100,4 +173,11 @@ class DnsModule(ScanModule):
                 f"{s}  ({DKIM_SELECTORS[s]})" if DKIM_SELECTORS[s] else s
                 for s in found
             ]
+
+        # Derived email-spoofing verdict from the records above (no extra network work).
+        # SPF sits inside the TXT records; surface its `all` qualifier, then the verdict.
+        if (spf := _spf_qualifier(out.get("TXT", []))) is not None:
+            out["SPF"] = [spf]
+        verdict, reason = assess_spoofing(out.get("TXT", []), dmarc_records, bool(found))
+        out["Email Spoofing"] = [_verdict_cell(verdict, reason)]
         return out
