@@ -316,6 +316,28 @@ def cms(detected: tuple[str, str | None] | None) -> str:
     return f"CMS: {_esc(f'{name} {version}' if version else name)}."
 
 
+def waf(result: ModuleResult) -> str | None:
+    """The Security module's WAF verdict (passive + active probe), as its own log line.
+
+    Like ``email_spoofing``/``cms``, ``app.py`` emits this straight after the Security
+    event so it lands under Security's line. It reads the "WAF Detection" section back out
+    of the result (one source of truth with the tab) via the same ``_sections``/``_plain``
+    the ``_security`` summary uses — the "Active Probe" row plain-texts to ``Blocked · …``
+    when the provocation was rejected. Returns ``None`` when nothing was named *and* the
+    probe wasn't blocked: a clean result isn't proof of no-WAF, so we stay silent rather
+    than announce an absence — the line only ever reports a positive.
+    """
+    section = _sections(result).get("WAF Detection", {})
+    vendors = [name for name, cell in section.items()
+               if name != "Active Probe" and _plain(cell) == "Detected"]
+    blocked = _plain(section.get("Active Probe", "")).startswith("Blocked")
+    if not vendors and not blocked:
+        return None
+    who = ", ".join(vendors) if vendors else "Unidentified"
+    line = f"WAF: [{GREEN}]{_esc(who)}[/]"
+    return f"{line} · actively blocking." if blocked else f"{line}."
+
+
 def overall(completed: int, failed: int, total: int, seconds: float) -> str:
     """The closing line. ``seconds`` is wall-clock for the whole scan — modules run
     concurrently, so summing their durations would overstate it several-fold."""

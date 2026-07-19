@@ -291,6 +291,10 @@ class WebScannerApp(App):
             self.query_one("#activity", ActivityLog).add(
                 activity.email_spoofing(event.result)
             )
+        if event.name == "security" and event.result is not None:
+            # Passive WAF verdict — its own line under Security's, only when detected.
+            if (line := activity.waf(event.result)) is not None:
+                self.query_one("#activity", ActivityLog).add(line)
         if event.name == "tech" and self.ctx is not None:
             # No result guard: a failed Tech scan can still surface a CMS via the
             # page's <meta name="generator">.
