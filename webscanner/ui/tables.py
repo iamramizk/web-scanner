@@ -98,14 +98,16 @@ def render_grid(grid: Grid, narrow: bool = False, avail: int | None = None) -> T
     stops expanding) so sibling Grids on one tab line up identically.
 
     ``narrow`` (phone-width terminals) keeps only the first + last column — for
-    Tech that's Name + Version, the two that matter — and lets them expand to the
-    available width instead of using the fixed ``widths``.
+    Tech that's Name + Version, the two that matter — and pins both to a fixed 50/50
+    ``ratio`` (not content-fit) so every sibling sub-table on the tab lines up
+    identically instead of each fitting its own name lengths.
     """
-    if narrow and len(grid.columns) > 2:
+    collapsed = narrow and len(grid.columns) > 2
+    if collapsed:
         keep = [0, len(grid.columns) - 1]
         columns = [grid.columns[i] for i in keep]
         rows = [[row[i] for i in keep] for row in grid]
-        grid = Grid(columns, rows)  # widths dropped → columns expand to fit
+        grid = Grid(columns, rows)  # widths dropped → columns sized by the ratio below
     widths = grid.widths
     table = Table(
         show_header=True,
@@ -119,7 +121,12 @@ def render_grid(grid: Grid, narrow: bool = False, avail: int | None = None) -> T
     )
     for i, col in enumerate(grid.columns):
         w = widths[i] if widths else None
-        if i == 0 and w is None:
+        if collapsed:
+            # Fixed 50/50 across every sub-table, so the Name/Version columns align
+            # regardless of each group's name lengths.
+            style = KEY_STYLE if i == 0 else MUTED
+            table.add_column(col, style=style, ratio=1, no_wrap=False, overflow="fold")
+        elif i == 0 and w is None:
             # No fixed widths (e.g. the narrow 2-column Tech): content-fit the Name
             # column but cap it at ~⅓ and let it wrap, like the key/value tables.
             name_fit = min(

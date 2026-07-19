@@ -192,7 +192,7 @@ Tab.-pseudo {
    so the grid collapses to a single full-width column and padding is trimmed to buy
    back horizontal room. */
 .-narrow #topbar {
-    padding: 0 1;
+    padding: 1 1 0 1;   /* keep the gap above the domain input; trim only below the tabs */
 }
 .-narrow #grid {
     grid-size: 1 1;

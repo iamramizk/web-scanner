@@ -6,6 +6,7 @@ from collections import deque
 from datetime import datetime
 
 from rich.markup import escape
+from rich.table import Table
 from rich.text import Text
 from textual.binding import Binding
 from textual.containers import Horizontal, HorizontalScroll
@@ -137,13 +138,15 @@ class StatusPanel(Static):
 class ActivityLog(RichLog):
     """Fixed scan log under the main panel; the newest line is always in view.
 
-    Lines are composed by ``activity.py`` — this only stamps the time, paints the
-    body, and decides how a too-long line is cut, so the wording stays testable
-    without an app.
+    Lines are composed by ``activity.py`` — this only stamps the time and paints the
+    body, so the wording stays testable without an app.
 
-    Each line is written as a ``no_wrap`` / ``overflow="ellipsis"`` Text at the
-    panel's exact width, so it's truncated with "…" at the panel edge and a wider
-    terminal reveals more of it. Nothing is pre-cropped to an assumed width.
+    Each line is a two-column ``Table.grid``: a fixed-width timestamp column and a
+    wrapping body column. When the body is wider than the panel it **wraps** (word
+    boundaries), and the grid's second column keeps every continuation line indented
+    past the timestamp — a hanging indent aligned under the first body character. The
+    grid is rendered at the panel's exact width, so a wider terminal simply fits more
+    on each line before wrapping.
 
     ``can_focus=False`` is load-bearing, not tidiness: RichLog inherits
     ScrollableContainer's ungated up/down bindings, so a focused log would swallow
@@ -159,35 +162,38 @@ class ActivityLog(RichLog):
 
     def __init__(self, **kwargs) -> None:
         # min_width=0: the 78 default renders every write at >=78 cells, overflowing
-        # a narrower panel. wrap=True: with wrap=False, RichLog forces
-        # overflow="ignore" on Text and the tail vanishes with no ellipsis.
+        # a narrower panel.
         super().__init__(markup=True, wrap=True, min_width=0, max_lines=self._MAX_LINES, **kwargs)
         # RichLog renders to strips at write time and never re-renders, so keep the
-        # markup to replay when the width changes.
-        self._entries: deque[str] = deque(maxlen=self._MAX_LINES)
+        # (stamp, body) markup pairs to replay when the width changes.
+        self._entries: deque[tuple[str, str]] = deque(maxlen=self._MAX_LINES)
         self._rendered_width: int | None = None
 
     def add(self, body: str) -> None:
         """Write one line, stamped with a muted [HH:MM:SS]."""
-        stamp = escape(f"[{datetime.now():%H:%M:%S}]")
-        markup = f"[{MUTED}]{stamp}[/] [{BODY}]{body}[/]"
-        self._entries.append(markup)
-        self._write(markup)
+        stamp = f"[{MUTED}]{escape(f'[{datetime.now():%H:%M:%S}]')}[/]"
+        body_markup = f"[{BODY}]{body}[/]"
+        self._entries.append((stamp, body_markup))
+        self._write(stamp, body_markup)
 
-    def _write(self, markup: str) -> None:
-        text = Text.from_markup(markup)
-        text.no_wrap = True
-        text.overflow = "ellipsis"
+    def _write(self, stamp: str, body: str) -> None:
+        # Two columns: the timestamp at a fixed width (its 10 chars + a 1-cell gap),
+        # then the body in a flexible column that wraps. The grid keeps the body
+        # column left edge constant, so wrapped continuation lines hang-indent under
+        # the first body character rather than sliding back under the timestamp.
+        grid = Table.grid(expand=True)
+        grid.add_column(width=11, no_wrap=True)
+        grid.add_column(ratio=1)
+        grid.add_row(Text.from_markup(stamp), Text.from_markup(body))
         # Explicit width, because RichLog's own sizing measures against
         # `app.console`, which is a plain 80 columns regardless of how wide the app
-        # actually is — every line would ellipsise at 80 on a wider terminal. Passing
-        # width bypasses measure/shrink/min_width entirely. Width 0 means we aren't
-        # laid out yet: let RichLog defer the write, and on_resize replays it.
+        # actually is — the body would wrap at 80 on a wider terminal. Width 0 means
+        # we aren't laid out yet: let RichLog defer the write, and on_resize replays it.
         width = self.scrollable_content_region.width
         if width:
-            self.write(text, width=width)
+            self.write(grid, width=width)
         else:
-            self.write(text)
+            self.write(grid)
 
     def clear(self) -> "ActivityLog":
         self._entries.clear()
@@ -204,13 +210,13 @@ class ActivityLog(RichLog):
         if not self._entries:
             return
         # RichLog renders to strips at write time and never re-renders, so replay at
-        # the new width: a wider terminal reveals more of each line, a narrower one
-        # re-ellipsises. Also fixes the first sizing, where deferred lines were
-        # rendered by RichLog without our explicit width.
+        # the new width: a wider terminal fits more before wrapping, a narrower one
+        # re-wraps to more lines. Also fixes the first sizing, where deferred lines
+        # were rendered by RichLog without our explicit width.
         entries = list(self._entries)
         super().clear()
-        for markup in entries:
-            self._write(markup)
+        for stamp, body in entries:
+            self._write(stamp, body)
 
 
 class SitemapTree(Tree):
@@ -237,6 +243,12 @@ class SitemapTree(Tree):
         # Redirect them to the app so ←/→ always changes tab from the Sitemap too.
         Binding("left", "prev_tab", show=False),
         Binding("right", "next_tab", show=False),
+        # The tree is height:auto inside the #main VerticalScroll, so it has nothing
+        # of its own to scroll — its inherited page up/down bindings would just no-op
+        # and swallow the keys. Redirect them to #main so paging works like every
+        # other tab.
+        Binding("pageup", "page_main_up", show=False),
+        Binding("pagedown", "page_main_down", show=False),
     ]
 
     #: Textual gives the expand/collapse chevron no component class of its own — it
@@ -306,6 +318,12 @@ class SitemapTree(Tree):
 
     def action_next_tab(self) -> None:
         self.app.action_next_tab()
+
+    def action_page_main_up(self) -> None:
+        self.app.action_scroll_main_up()
+
+    def action_page_main_down(self) -> None:
+        self.app.action_scroll_main_down()
 
     def action_toggle_all(self) -> None:
         branches = self._branches()
