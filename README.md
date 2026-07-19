@@ -19,13 +19,14 @@ a server-status panel that stay pinned in place.
 resolvers for blocklist checks, the system `whois`, and stdlib `ssl`/`socket`. Country
 borders are embedded (Natural Earth), so even the map needs no tile service.
 
-![WebScanner](https://raw.githubusercontent.com/iamramizk/web-scanner/main/.github/screenshot-v2.1.png)
+![WebScanner — DNS tab](https://raw.githubusercontent.com/iamramizk/web-scanner/main/.github/screenshot-v2-1.png)
+
+![WebScanner — Security tab](https://raw.githubusercontent.com/iamramizk/web-scanner/main/.github/screenshot-v2-2.png)
 
 ## Contents
 
 - [Features](#features)
 - [Installation](#installation)
-  - [From source (development)](#from-source-development)
 - [Usage](#usage)
 - [Updating](#updating)
 - [Keys](#keys)
@@ -34,30 +35,41 @@ borders are embedded (Natural Earth), so even the map needs no tile service.
 
 Ten tabs, scanned concurrently and rendered live as each module finishes:
 
-- **DNS** — A / AAAA / NS / CNAME / SOA / MX / TXT / CAA / DS / DNSKEY records, plus email
-  authentication folded in: DMARC (`_dmarc`) and DKIM (probes ~40 known selectors, each hit
-  labelled with the email provider it points to, where the selector identifies one). Two
-  derived rows round it out: SPF's `all` qualifier, and an **Email Spoofing** verdict
-  (Protected / Weak / Vulnerable) computed from DMARC enforcement, not SPF alone.
-- **Whois** — parsed system `whois`, with rich gTLD and ccTLD field support (registrar,
-  dates, nameservers, per-contact details).
-- **Subdomains** — discovered natively from TLS certificate SANs and `socket` probes of
-  common subdomains — no third-party enumeration services.
-- **SSL** — certificate issuer, subject, SANs, validity window, trust and expiry, parsed
-  from the live TLS handshake.
-- **Security** — WAF detection (passive header/cookie fingerprinting plus an active probe
-  that sends obvious attack payloads to see if it gets blocked, naming vendors like
-  Cloudflare, Sucuri, Akamai, ModSecurity), TCP connect port scan, presence of HTTP
-  security headers (CSP, HSTS, X-Frame-Options, …), and blocklist status across public
-  filtering resolvers (AdGuard, CleanBrowsing, Cloudflare, Google, OpenDNS, Quad9).
+- **DNS** — records plus email authentication, folded into one tab.
+  - A / AAAA / NS / CNAME / SOA / MX / TXT / CAA / DS / DNSKEY records
+  - DMARC (`_dmarc`) and DKIM (probes ~40 selectors, each labelled with its email provider)
+  - SPF `all` qualifier, and an **Email Spoofing** verdict (Protected / Weak / Vulnerable)
+    computed from DMARC enforcement, not SPF alone
+- **Whois** — parsed system `whois`, with rich gTLD and ccTLD field support.
+  - Registrar, registration / expiry dates, nameservers
+  - Per-contact details where published
+- **Subdomains** — discovered natively, no third-party enumeration services.
+  - TLS certificate SANs
+  - `socket` probes of common subdomains
+- **SSL** — the live TLS certificate, parsed from the handshake.
+  - Issuer, subject, SANs
+  - Validity window, trust and expiry
+- **Security** — four checks, each a sub-table.
+  - **WAF detection** — passive header/cookie fingerprinting plus an active probe that
+    sends obvious attack payloads to see if it gets blocked (names Cloudflare, Sucuri,
+    Akamai, ModSecurity, …)
+  - **Open ports** — TCP connect scan of common ports
+  - **HTTP security headers** — CSP, HSTS, X-Frame-Options, … present or not
+  - **Blocklists** — status across public filtering resolvers (AdGuard, CleanBrowsing,
+    Cloudflare, Google, OpenDNS, Quad9)
 - **Headers** — the full set of HTTP response headers.
-- **Tech** — technology-stack detection via [Wappalyzer](https://github.com/tunetheweb/wappalyzer),
-  listing each technology with its category, confidence, groups and version.
-- **SEO** — page content (title/description with length hints, H1–H3, social links), top
-  keyword n-grams, `robots.txt` and sitemaps, and JSON-LD structured data.
-- **Sitemap** — the site's URLs discovered from its `sitemap.xml` (recursing into nested
-  sitemap indexes) and rebuilt into a clickable URL-path tree — no crawling.
-- **Links** — internal and external links, with their anchor text.
+- **Tech** — technology-stack detection via [Wappalyzer](https://github.com/tunetheweb/wappalyzer).
+  - Each technology with its category, confidence, groups and version
+- **SEO** — everything on-page that search engines read.
+  - Title / description with length hints, H1–H3, social links
+  - Top keyword n-grams (1 / 2 / 3-word)
+  - `robots.txt` and declared sitemaps
+  - JSON-LD structured data
+- **Sitemap** — the site's URLs as a clickable path tree, no crawling.
+  - Discovered from `sitemap.xml`, recursing into nested sitemap indexes
+  - Rebuilt into a folder tree keyed by URL path
+- **Links** — links found on the page, with their anchor text.
+  - Internal and external, split into sub-tables
 
 Alongside the tabs, three fixed panels:
 
@@ -66,7 +78,9 @@ Alongside the tabs, three fixed panels:
 - **Country map** — real country outlines auto-framed around the server's location, drawn
   with braille characters (`+` / `-` to zoom).
 - **Server** — online status and response time, the final URL after redirects, IP,
-  geolocation, ISP, AS, hosting provider and detected CMS (name and version).
+  geolocation, ISP, AS, hosting provider and detected CMS (name and version). When many
+  sites share the server's IP, it flags the address as shared and counts how many distinct
+  domains resolve to it (via a free reverse-IP lookup).
 
 Requests to the site being scanned wear a **coherent desktop-Chrome identity** — a real
 User-Agent plus the headers Chrome actually sends beside it — picked once per scan and
