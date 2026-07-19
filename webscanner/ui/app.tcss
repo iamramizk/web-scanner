@@ -20,9 +20,14 @@ Screen {
     color: white;
 }
 
+/* TabBar is a HorizontalScroll so the selected tab can be scrolled into view when
+   the row overflows a narrow terminal; the scrollbar itself is hidden. */
 #tabs {
     height: 1;
     margin-top: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-size: 0 0;
 }
 
 /* Tabs stay dim regardless of scan status; only the selected tab is highlighted. */
@@ -37,6 +42,14 @@ Tab.-selected {
     background: $primary;
     color: $text;
     text-style: bold;
+}
+/* Activity/Server pseudo tabs: hidden on wide terminals (fixed panels there),
+   shown only in the narrow single-column layout. */
+Tab.-pseudo {
+    display: none;
+}
+.-narrow Tab.-pseudo {
+    display: block;
 }
 
 /* ---- bottom footer row: keybar (left) + progress (right) ---- */
@@ -171,4 +184,27 @@ Tab.-selected {
     border: round $primary;
     padding: 1 1 0 2;   /* space above the table and to the left */
     scrollbar-size: 0 0;   /* keep the bar hidden even if content overflows */
+}
+
+/* ---- narrow (phone-width) layout ----
+   Applied below _NARROW_MAX cols via the `-narrow` class on the Screen (see
+   _apply_narrow). The fixed map + Server panels and the activity strip become tabs,
+   so the grid collapses to a single full-width column and padding is trimmed to buy
+   back horizontal room. */
+.-narrow #topbar {
+    padding: 0 1;
+}
+.-narrow #grid {
+    grid-size: 1 1;
+    grid-columns: 1fr;
+    grid-rows: 1fr;
+}
+/* One visible cell now — drop the row-span so the single column fills the height. */
+.-narrow #left {
+    row-span: 1;
+}
+/* Map + Server become tabs; the activity strip is toggled by tab in Python. */
+.-narrow #map,
+.-narrow #status {
+    display: none;
 }

@@ -59,27 +59,53 @@ def _smart_token(tok: str) -> str:
     return tok.upper() if tok.lower() in _ACRONYMS else tok.capitalize()
 
 
-def render_result(name: str, data: Any) -> RenderableType:
+def _cap_key_width(width: int | None, avail: int | None) -> int | None:
+    """Cap a first-column width at ~⅓ of the available table width so a long key
+    (a header name, a whois field) can't dominate the row; the column then wraps
+    within that cap. ``avail`` unknown (pre-layout) → the width is left uncapped.
+    ``width`` None means "no content-fit width yet" → take the cap outright."""
+    if avail and avail > 0:
+        cap = max(6, avail // 3)
+        return min(width, cap) if width else cap
+    return width
+
+
+def render_result(name: str, data: Any, narrow: bool = False, avail: int | None = None) -> RenderableType:
     """Render a module's result: multi-column Grid, stacked sub-tables (Sections),
-    or one key/value table."""
+    or one key/value table.
+
+    ``narrow`` collapses wide (>2 column) Grids to their first + last column so a
+    multi-column tab (Tech: Name/…/Version) still reads on a phone-width terminal.
+    ``avail`` is the table's available character width; when known, the first column
+    is capped at ~⅓ of it and wraps rather than running the row wide.
+    """
     if isinstance(data, Grid):
-        return render_grid(data)
+        return render_grid(data, narrow=narrow, avail=avail)
     if isinstance(data, Sections):
         # SEO pins all sub-tables to one fixed first-column width so its four
         # tables (Content/Keywords/Robots/Schema) line up exactly.
-        return render_sections(data, key_width=12 if name == "seo" else None)
+        return render_sections(data, key_width=12 if name == "seo" else None, narrow=narrow, avail=avail)
     mode = "smart" if name in _SMART_LABEL_TABS else "upper"
-    return render_table(data, TAB_HEADERS.get(name), mode=mode)
+    return render_table(data, TAB_HEADERS.get(name), mode=mode, avail=avail)
 
 
-def render_grid(grid: Grid) -> Table:
+def render_grid(grid: Grid, narrow: bool = False, avail: int | None = None) -> Table:
     """Render a multi-column table (e.g. Tech: Name/Category/Confidence/…).
 
     First column is the primary name (bold); the rest are dim, matching the
     key/value tables. Long list columns fold rather than truncate. When the Grid
     carries ``widths``, every column is pinned to that fixed width (and the table
     stops expanding) so sibling Grids on one tab line up identically.
+
+    ``narrow`` (phone-width terminals) keeps only the first + last column — for
+    Tech that's Name + Version, the two that matter — and lets them expand to the
+    available width instead of using the fixed ``widths``.
     """
+    if narrow and len(grid.columns) > 2:
+        keep = [0, len(grid.columns) - 1]
+        columns = [grid.columns[i] for i in keep]
+        rows = [[row[i] for i in keep] for row in grid]
+        grid = Grid(columns, rows)  # widths dropped → columns expand to fit
     widths = grid.widths
     table = Table(
         show_header=True,
@@ -93,7 +119,15 @@ def render_grid(grid: Grid) -> Table:
     )
     for i, col in enumerate(grid.columns):
         w = widths[i] if widths else None
-        if i == 0:
+        if i == 0 and w is None:
+            # No fixed widths (e.g. the narrow 2-column Tech): content-fit the Name
+            # column but cap it at ~⅓ and let it wrap, like the key/value tables.
+            name_fit = min(
+                MAX_KEY_WIDTH,
+                max((len(str(row[0])) for row in grid), default=len(col)),
+            )
+            table.add_column(col, style=KEY_STYLE, width=_cap_key_width(name_fit, avail), no_wrap=False, overflow="fold")
+        elif i == 0:
             table.add_column(col, style=KEY_STYLE, width=w, no_wrap=True, overflow="ellipsis")
         else:
             table.add_column(col, style=MUTED, width=w, no_wrap=False, overflow="fold")
@@ -105,13 +139,17 @@ def render_grid(grid: Grid) -> Table:
     return table
 
 
-def render_sections(sections: Sections, key_width: int | None = None) -> Group:
+def render_sections(sections: Sections, key_width: int | None = None, narrow: bool = False, avail: int | None = None) -> Group:
     """Render several titled sub-tables stacked; content-fit sections share one
     first-column width, ratio sections use their fixed proportions. A caller may
-    pass ``key_width`` to pin that shared first-column width explicitly."""
+    pass ``key_width`` to pin that shared first-column width explicitly. ``narrow``
+    is forwarded to any Grid sub-tables (Tech) so they collapse to two columns.
+    ``avail`` caps the shared first-column width at ~⅓ of the table width."""
     if key_width is None:
         widths = [_col1_width(s.data, s.headers, mode="raw") for s in sections if not s.ratio]
         key_width = max([w for w in widths if w], default=None)
+    # Cap the shared key column at ~⅓ so a long field can't widen every sub-table.
+    key_width = _cap_key_width(key_width, avail)
     parts: list[RenderableType] = [Text("")]  # space above the first section title
     for i, sec in enumerate(sections):
         if i:
@@ -121,7 +159,7 @@ def render_sections(sections: Sections, key_width: int | None = None) -> Group:
         parts.append(Text(f" {sec.title.upper()} ", style=SECTION_STYLE))
         if isinstance(sec.data, Grid):
             # e.g. Tech's per-group tables — multi-column, not key/value
-            parts.append(render_grid(sec.data))
+            parts.append(render_grid(sec.data, narrow=narrow, avail=avail))
         else:
             parts.append(
                 render_table(sec.data, sec.headers, mode="raw", spaced=sec.spaced, key_width=key_width, ratio=sec.ratio)
@@ -197,6 +235,7 @@ def render_table(
     spaced: bool = True,
     key_width: int | None = None,
     ratio: tuple[int, int] | None = None,
+    avail: int | None = None,
 ) -> Table:
     """Generic key/value (dict), pair-list, or indexed (list) table.
 
@@ -204,7 +243,8 @@ def render_table(
     ``"smart"`` (Title Case, acronyms upper), or ``"raw"``. ``spaced`` inserts a
     blank line between rows. ``key_width`` fixes the first-column width (content-fit
     by default). ``ratio`` (col1, col2) forces proportional columns instead of
-    content-fit (e.g. (3, 2) for 60/40).
+    content-fit (e.g. (3, 2) for 60/40). ``avail`` caps the content-fit first column
+    at ~⅓ of the table width (it then wraps instead of running the row wide).
     """
     table = Table(
         show_header=headers is not None,
@@ -218,6 +258,7 @@ def render_table(
     )
     if key_width is None:
         key_width = _col1_width(data, headers, mode)
+    key_width = _cap_key_width(key_width, avail)
 
     if isinstance(data, dict) or _is_pairs(data):
         if isinstance(data, dict):
@@ -234,8 +275,9 @@ def render_table(
             # Table(expand=True) routes all surplus width there and the fixed-width
             # key column stays put — otherwise Rich spreads the surplus across both
             # columns proportionally and the key column widens when values are short
-            # (e.g. an empty Robots/Schema section in the SEO tab).
-            table.add_column(c1, style=KEY_STYLE, width=key_width, no_wrap=True, overflow="ellipsis")
+            # (e.g. an empty Robots/Schema section in the SEO tab). The key column
+            # folds (not ellipsis) so a field wider than its ~⅓ cap wraps in place.
+            table.add_column(c1, style=KEY_STYLE, width=key_width, no_wrap=False, overflow="fold")
             table.add_column(c2, ratio=1, no_wrap=False, overflow="fold")
         _add_spaced(table, rows, spaced)
     elif isinstance(data, (list, tuple)):

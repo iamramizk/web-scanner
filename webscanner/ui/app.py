@@ -17,6 +17,7 @@ import re
 import time
 
 from bs4 import BeautifulSoup
+from rich.padding import Padding
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
@@ -30,12 +31,23 @@ from ..modules import all_modules
 from ..net.version_check import check_for_update
 from . import activity
 from .export import export_csvs
-from .tables import UNSET, render_result
+from .tables import UNSET, render_result, render_status
 from .widgets import ActivityLog, MapPanel, SitemapTree, StatusPanel, TabBar, Tab
 
 #: width (cells) of the footer progress bar and its dim (incomplete) colour
 _BAR_WIDTH = 22
 _BAR_DIM = "grey30"
+
+#: below this terminal width the layout collapses to a single column (the fixed map
+#: + Server panels become tabs, activity becomes a tab) — see _apply_narrow.
+_NARROW_MAX = 90
+
+#: pseudo-tabs shown only in the narrow layout, before the real module tabs: the
+#: Activity log and the Server panel, which are fixed side/bottom panels on wide
+#: terminals. (name, label) — names must not collide with any module name.
+_PSEUDO_TABS: tuple[tuple[str, str], ...] = (("activity", "Activity"), ("server", "Server"))
+_PSEUDO_NAMES = frozenset(name for name, _ in _PSEUDO_TABS)
+_PSEUDO_LABELS = {name: label for name, label in _PSEUDO_TABS}
 
 
 def _cms_from_tech(data: object) -> tuple[str, str | None] | None:
@@ -166,6 +178,10 @@ class WebScannerApp(App):
         Binding("minus,underscore", "zoom_out", "Zoom map out", show=False),
         Binding("pageup", "scroll_main_up", "Scroll up", show=False),
         Binding("pagedown", "scroll_main_down", "Scroll down", show=False),
+        # Number keys jump to the Nth visible tab: 1 = first tab (DNS when wide,
+        # Activity when narrow) … 9 = ninth, 0 = tenth. Not priority, so a digit typed
+        # into the focused domain input is entered as text rather than switching tabs.
+        *[Binding(str(d), f"select_tab({d})", show=False) for d in range(10)],
     ]
 
     def __init__(self, target: str | None = None) -> None:
@@ -184,6 +200,9 @@ class WebScannerApp(App):
         # value handed to StatusPanel so the export matches what's on screen.
         self._cms: object = UNSET
         self.selected = self.modules[0].name
+        # Narrow (phone-width) layout: right column + activity strip become tabs.
+        # Applied for real in on_mount/on_resize once the terminal size is known.
+        self._narrow = False
         self.completed = 0
         self.failed = 0
         self._scanning = False
@@ -204,7 +223,7 @@ class WebScannerApp(App):
     def compose(self) -> ComposeResult:
         with Vertical(id="topbar"):
             yield Input(value=self._target or "", placeholder="domain… (press enter to scan)", id="domain")
-            yield TabBar(self.modules, id="tabs")
+            yield TabBar(self.modules, pseudo=_PSEUDO_TABS, id="tabs")
         with Grid(id="grid"):
             with Vertical(id="left"):
                 with VerticalScroll(id="main"):
@@ -225,8 +244,8 @@ class WebScannerApp(App):
         self.query_one("#status", VerticalScroll).border_title = "Server"
         self.query_one("#activity", ActivityLog).border_title = "Activity Log"
         self.query_one("#tabs", TabBar).set_selected(self.selected)
-        self._update_main_title()
-        self._set_keybar(editing=False)
+        # Establish the layout (wide vs narrow) before the first paint / scan.
+        self._apply_narrow(self.size.width < _NARROW_MAX)
         # own group: the scan worker below is exclusive=True, which cancels every
         # other worker in its group — a shared/default group would kill this one.
         self.run_worker(
@@ -236,6 +255,37 @@ class WebScannerApp(App):
             self.start_scan(self._target)
         else:
             self.action_toggle_edit()
+
+    def on_resize(self, event) -> None:
+        """Switch between the wide and narrow layouts as the terminal is resized."""
+        narrow = event.size.width < _NARROW_MAX
+        if narrow != self._narrow:
+            self._apply_narrow(narrow)
+
+    def _apply_narrow(self, narrow: bool) -> None:
+        """Toggle the single-column phone layout.
+
+        Adds/removes the ``-narrow`` class on the Screen (which drives the CSS: the
+        map + Server panels hide, the grid collapses to one column) and re-derives the
+        Python-side state that CSS can't: the visible tab set (Activity/Server become
+        real tabs), the selected tab (a pseudo tab can't stay selected once it vanishes
+        on the way back to wide), and which of #main / #activity is shown.
+        """
+        self._narrow = narrow
+        if self.screen is not None:
+            self.screen.set_class(narrow, "-narrow")
+        if narrow:
+            # Entering narrow: select the first tab (Activity), mirroring how DNS is
+            # the default first tab on wide terminals.
+            self.selected = _PSEUDO_TABS[0][0]
+        elif self.selected in _PSEUDO_NAMES:
+            # The pseudo tabs don't exist on wide terminals — fall back to the first
+            # real module tab so the selection stays valid.
+            self.selected = self.modules[0].name
+        self.query_one("#tabs", TabBar).set_selected(self.selected)
+        self._refresh_main()
+        editing = self.focused is not None and self.focused.id == "domain"
+        self._set_keybar(editing=editing)
 
     async def _check_version(self) -> None:
         latest = await asyncio.to_thread(check_for_update, __version__)
@@ -314,12 +364,14 @@ class WebScannerApp(App):
             if event.status is ModuleStatus.DONE and self.ctx is not None:
                 self.query_one("#map", MapPanel).set_geo(self.ctx.geo)
                 self.query_one("#status-content", StatusPanel).set_ctx(self.ctx)
+                self._refresh_server_tab()
             return
         if event.name == SHARED_IP:
             # Not a module — a late panel-only refresh once the shared-IP lookup lands.
             # Re-pass the tracked CMS so a completed Tech row isn't dropped back to UNSET.
             if self.ctx is not None:
                 self.query_one("#status-content", StatusPanel).set_ctx(self.ctx, cms=self._cms)
+                self._refresh_server_tab()
             return
 
         self.query_one("#tabs", TabBar).set_status(event.name, event.status)
@@ -351,6 +403,7 @@ class WebScannerApp(App):
             detected = _detect_cms(data, self.ctx.html)
             self._cms = detected
             self.query_one("#status-content", StatusPanel).set_ctx(self.ctx, cms=detected)
+            self._refresh_server_tab()
             self.query_one("#activity", ActivityLog).add(activity.cms(detected))
         self._update_progress()
 
@@ -386,17 +439,30 @@ class WebScannerApp(App):
     def _module_names(self) -> list[str]:
         return [m.name for m in self.modules]
 
+    def _nav_names(self) -> list[str]:
+        """Tab names in cycle order — the pseudo tabs (Activity/Server) lead the list
+        in the narrow layout, and are absent (fixed panels) when wide."""
+        names = self._module_names()
+        if self._narrow:
+            return [name for name, _ in _PSEUDO_TABS] + names
+        return names
+
     def _select(self, name: str) -> None:
         self.selected = name
         self.query_one("#tabs", TabBar).set_selected(name)
         self._refresh_main()
+        # Reset the shared main-panel scroll so a tab left scrolled-down doesn't carry
+        # its offset onto the next tab (they all share the one #main VerticalScroll).
+        self.query_one("#main", VerticalScroll).scroll_home(animate=False)
         # keybar depends on the selected tab (Sitemap shows tree-nav hints); keep
         # the editing state if the domain input still has focus.
         editing = self.focused is not None and self.focused.id == "domain"
         self._set_keybar(editing=editing)
 
     def _update_main_title(self) -> None:
-        label = next(m.label for m in self.modules if m.name == self.selected)
+        label = _PSEUDO_LABELS.get(self.selected) or next(
+            m.label for m in self.modules if m.name == self.selected
+        )
         main = self.query_one("#main")
         main.border_title = label
         main.border_subtitle = ""  # only the Sitemap tab sets one (URL total)
@@ -412,15 +478,54 @@ class WebScannerApp(App):
         self.query_one("#main-loading", LoadingIndicator).display = loading
         self.query_one("#main-content", Static).display = not loading
 
+    def _main_avail(self) -> int | None:
+        """Character width available to the main-panel table (inside border + padding),
+        or None before the panel is laid out — the table renderer then skips the ⅓ cap."""
+        width = self.query_one("#main", VerticalScroll).content_size.width
+        return width or None
+
     def _refresh_main(self) -> None:
         self._update_main_title()
-        result = self.results.get(self.selected)
+        main = self.query_one("#main", VerticalScroll)
+        activity = self.query_one("#activity", ActivityLog)
+
+        # Activity pseudo-tab (narrow only): show the live log widget full-height in
+        # place of the main panel. In the wide layout it's the fixed bottom strip.
+        if self._narrow and self.selected == "activity":
+            main.display = False
+            activity.display = True
+            # Drop tree visibility so _sync_focus doesn't park focus on a widget
+            # whose parent (#main) is now hidden.
+            self.query_one("#main-tree", SitemapTree).display = False
+            self._sync_focus()
+            return
+        main.display = True
+        activity.display = not self._narrow
+
         tree = self.query_one("#main-tree", SitemapTree)
         content = self.query_one("#main-content", Static)
+        loading_widget = self.query_one("#main-loading", LoadingIndicator)
+
+        # Server pseudo-tab (narrow only): render the same status table the fixed
+        # Server panel shows, into the main content area.
+        if self.selected == "server":
+            main.border_subtitle = ""
+            tree.display = False
+            has_ctx = self.ctx is not None
+            loading_widget.display = not has_ctx
+            content.display = has_ctx
+            if has_ctx:
+                # 1ch top + left pad so the status table sits clear of the border,
+                # consistent with where the other tabs' content begins.
+                content.update(Padding(render_status(self.ctx, self._cms), (1, 0, 0, 1)))
+            self._sync_focus()
+            return
+
+        result = self.results.get(self.selected)
         loading = result is None
         # Spinner inside the panel until this tab's module completes; swap to the
         # Tree (Sitemap tab) or the Static content once there's a result to render.
-        self.query_one("#main-loading", LoadingIndicator).display = loading
+        loading_widget.display = loading
 
         want_tree = (
             self.selected == "sitemap"
@@ -446,8 +551,27 @@ class WebScannerApp(App):
             msg = "no sitemap found" if self.selected == "sitemap" else "no data found"
             self._set_main(f"[dim]{msg}[/]")
         else:
-            content.update(render_result(self.selected, result.data))
+            avail = self._main_avail()
+            content.update(
+                render_result(self.selected, result.data, narrow=self._narrow, avail=avail)
+            )
+            # When switching from a tab that had #main hidden (Activity), the panel's
+            # content_size isn't known this tick, so the ⅓ column cap was skipped.
+            # Re-render once layout settles so the cap applies.
+            if avail is None:
+                self.call_after_refresh(self._reflow)
         self._sync_focus()
+
+    def _reflow(self) -> None:
+        """Re-render the current tab once the main panel has a known width (used after
+        it was un-hidden, when the first render ran before layout gave it a size)."""
+        if self._main_avail() is not None:
+            self._refresh_main()
+
+    def _refresh_server_tab(self) -> None:
+        """Re-render the Server pseudo-tab as its status data lands (narrow only)."""
+        if self._narrow and self.selected == "server":
+            self._refresh_main()
 
     def _sync_focus(self) -> None:
         """Focus the Sitemap Tree while that tab is up (so ↑/↓/space reach it); drop
@@ -469,16 +593,27 @@ class WebScannerApp(App):
     def action_prev_tab(self) -> None:
         if self.focused and self.focused.id == "domain":
             return
-        names = self._module_names()
+        names = self._nav_names()
         idx = (names.index(self.selected) - 1) % len(names)
         self._select(names[idx])
 
     def action_next_tab(self) -> None:
         if self.focused and self.focused.id == "domain":
             return
-        names = self._module_names()
+        names = self._nav_names()
         idx = (names.index(self.selected) + 1) % len(names)
         self._select(names[idx])
+
+    def action_select_tab(self, digit: int) -> None:
+        """Jump to the Nth visible tab. ``digit`` is the key pressed: 1..9 select the
+        1st..9th tab, 0 selects the 10th. Ignored while editing the domain input (the
+        digit is typed there instead) or when there's no such tab."""
+        if self.focused and self.focused.id == "domain":
+            return
+        position = 10 if digit == 0 else digit
+        names = self._nav_names()
+        if position <= len(names):
+            self._select(names[position - 1])
 
     def action_rescan(self) -> None:
         if self.ctx is not None:
@@ -537,11 +672,18 @@ class WebScannerApp(App):
         if editing:
             pairs = [("enter", "Scan"), ("esc", "Cancel")]
         elif self.selected == "sitemap":
-            # tree-navigation hints, shown only while the Sitemap tab is up
-            pairs = [
-                ("←/→", "Tab"), ("↑/↓", "Move"), ("enter", "Toggle"),
-                ("space", "All"), ("r", "Rescan"), ("esc", "Edit"),
-            ]
+            # tree-navigation hints, shown only while the Sitemap tab is up. The
+            # narrow layout drops Rescan/Edit to fit the phone-width footer.
+            if self._narrow:
+                pairs = [("↑/↓", "Move"), ("enter", "Toggle"), ("space", "All"), ("←/→", "Tab")]
+            else:
+                pairs = [
+                    ("←/→", "Tab"), ("↑/↓", "Move"), ("enter", "Toggle"),
+                    ("space", "All"), ("r", "Rescan"), ("esc", "Edit"),
+                ]
+        elif self._narrow:
+            # Compact set — the full labels overflow a phone-width footer.
+            pairs = [("←/→", "Tab"), ("r", "Scan"), ("s", "Save"), ("q", "Quit")]
         else:
             pairs = [("q", "Quit"), ("←/→", "Tab"), ("r", "Rescan"), ("s", "Save"), ("esc", "Edit domain")]
         text = "   ".join(f"[b {c}]{k}[/] {label}" for k, label in pairs)

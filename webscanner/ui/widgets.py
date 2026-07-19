@@ -8,7 +8,7 @@ from datetime import datetime
 from rich.markup import escape
 from rich.text import Text
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Horizontal, HorizontalScroll
 from textual.message import Message
 from textual.widgets import RichLog, Static, Tree
 
@@ -29,10 +29,14 @@ class Tab(Static):
             self.tab_name = tab_name
             super().__init__()
 
-    def __init__(self, name: str, label: str) -> None:
+    def __init__(self, name: str, label: str, pseudo: bool = False) -> None:
         super().__init__(label, id=f"tab-{name}")
         self.tab_name = name
         self.add_class("-pending")
+        # Pseudo tabs (Activity/Server) exist only in the narrow layout; CSS hides
+        # them on wide terminals where those are fixed panels instead.
+        if pseudo:
+            self.add_class("-pseudo")
 
     def set_status(self, status: ModuleStatus) -> None:
         self.remove_class(*_STATUS_CLASSES)
@@ -45,12 +49,28 @@ class Tab(Static):
         self.post_message(self.Clicked(self.tab_name))
 
 
-class TabBar(Horizontal):
-    def __init__(self, modules, **kwargs) -> None:
+class TabBar(HorizontalScroll):
+    """The row of tabs. Scrolls horizontally so the selected tab is always brought
+    into view when the row is wider than the terminal (narrow screens) — Textual's
+    plain ``Horizontal`` would just clip the overflow with no way to reach it.
+
+    ``pseudo`` tabs (Activity/Server) are rendered first but hidden by CSS on wide
+    terminals; they surface only in the narrow layout, where those panels become tabs.
+
+    ``can_focus=False`` keeps single-key nav (↑/↓ for the Sitemap tree, etc.) from
+    being swallowed by the scroll container's own bindings.
+    """
+
+    can_focus = False
+
+    def __init__(self, modules, pseudo: tuple[tuple[str, str], ...] = (), **kwargs) -> None:
         super().__init__(**kwargs)
         self._modules = list(modules)
+        self._pseudo = list(pseudo)
 
     def compose(self):
+        for name, label in self._pseudo:
+            yield Tab(name, label, pseudo=True)
         for module in self._modules:
             yield Tab(module.name, module.label)
 
@@ -58,8 +78,14 @@ class TabBar(Horizontal):
         self.query_one(f"#tab-{name}", Tab).set_status(status)
 
     def set_selected(self, name: str) -> None:
+        selected = None
         for tab in self.query(Tab):
             tab.set_selected(tab.tab_name == name)
+            if tab.tab_name == name:
+                selected = tab
+        # Keep the active tab visible when the row overflows the terminal width.
+        if selected is not None and selected.display:
+            self.scroll_to_widget(selected, animate=False)
 
 
 class MapPanel(Static):
@@ -206,6 +232,11 @@ class SitemapTree(Tree):
     BINDINGS = [
         Binding("enter", "toggle_node", "Toggle", show=False),
         Binding("space", "toggle_all", "Expand/collapse all", show=False),
+        # Tree's base (ScrollView) binds left/right to horizontal scroll, which would
+        # swallow the app's ←/→ tab navigation whenever a long URL overflows the panel.
+        # Redirect them to the app so ←/→ always changes tab from the Sitemap too.
+        Binding("left", "prev_tab", show=False),
+        Binding("right", "next_tab", show=False),
     ]
 
     #: Textual gives the expand/collapse chevron no component class of its own — it
@@ -269,6 +300,12 @@ class SitemapTree(Tree):
     def action_open_leaf(self, index: int) -> None:
         if 0 <= index < len(self._leaf_urls):
             self.app.open_url(self._leaf_urls[index])
+
+    def action_prev_tab(self) -> None:
+        self.app.action_prev_tab()
+
+    def action_next_tab(self) -> None:
+        self.app.action_next_tab()
 
     def action_toggle_all(self) -> None:
         branches = self._branches()
