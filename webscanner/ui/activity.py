@@ -27,7 +27,7 @@ from typing import Any, Callable
 
 from rich.markup import escape
 
-from ..colors import GREEN, RED
+from ..colors import BLUE, GREEN, RED
 from ..core.context import ScanContext
 from ..core.models import ModuleResult, ModuleStatus, ScanEvent
 from ..core.scanner import PREFETCH
@@ -336,6 +336,12 @@ def waf(result: ModuleResult) -> str | None:
     who = ", ".join(vendors) if vendors else "Unidentified"
     line = f"WAF: [{GREEN}]{_esc(who)}[/]"
     return f"{line} · actively blocking." if blocked else f"{line}."
+
+
+def update_available(latest: str) -> str:
+    """A newer release exists on PyPI. Emitted once, after the scan's own closing
+    line, only when a newer version was actually found — see net/version_check.py."""
+    return f"Update: [{BLUE}]v{_esc(latest)} available[/] — run `pipx upgrade web-scanner`."
 
 
 def overall(completed: int, failed: int, total: int, seconds: float) -> str:

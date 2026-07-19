@@ -12,6 +12,7 @@ live as each module completes.
 
 from __future__ import annotations
 
+import asyncio
 import re
 import time
 
@@ -22,9 +23,11 @@ from textual.containers import Grid, Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.widgets import Input, LoadingIndicator, Static
 
+from .. import __version__
 from ..core import AsyncScanner, ModuleStatus, ScanContext, ScanEvent
 from ..core.scanner import PREFETCH
 from ..modules import all_modules
+from ..net.version_check import check_for_update
 from . import activity
 from .export import export_csvs
 from .tables import UNSET, render_result
@@ -130,6 +133,14 @@ class ScanFinished(Message):
     pass
 
 
+class VersionChecked(Message):
+    """Result of the background PyPI update check (see net/version_check.py)."""
+
+    def __init__(self, latest: str | None) -> None:
+        self.latest = latest
+        super().__init__()
+
+
 class WebScannerApp(App):
     CSS_PATH = "app.tcss"
     TITLE = "WebScanner"
@@ -182,6 +193,11 @@ class WebScannerApp(App):
         # last result rendered into the sitemap Tree, so switching tabs doesn't
         # rebuild (and re-collapse) it every visit.
         self._tree_result = None
+        # background PyPI update check (see _check_version) — announced once, after
+        # whichever finishes last: the scan or the check itself.
+        self._update_available: str | None = None
+        self._version_checked = False
+        self._update_announced = False
 
     # ---- layout -----------------------------------------------------------
 
@@ -211,10 +227,37 @@ class WebScannerApp(App):
         self.query_one("#tabs", TabBar).set_selected(self.selected)
         self._update_main_title()
         self._set_keybar(editing=False)
+        # own group: the scan worker below is exclusive=True, which cancels every
+        # other worker in its group — a shared/default group would kill this one.
+        self.run_worker(
+            self._check_version(), name="version-check", group="version-check"
+        )
         if self._target:
             self.start_scan(self._target)
         else:
             self.action_toggle_edit()
+
+    async def _check_version(self) -> None:
+        latest = await asyncio.to_thread(check_for_update, __version__)
+        self.post_message(VersionChecked(latest))
+
+    def on_version_checked(self, message: VersionChecked) -> None:
+        self._update_available = message.latest
+        self._version_checked = True
+        self._maybe_announce_update()
+
+    def _maybe_announce_update(self) -> None:
+        if (
+            self._update_announced
+            or self._scanning
+            or not self._version_checked
+            or self._update_available is None
+        ):
+            return
+        self._update_announced = True
+        self.query_one("#activity", ActivityLog).add(
+            activity.update_available(self._update_available)
+        )
 
     # ---- scanning ---------------------------------------------------------
 
@@ -313,7 +356,8 @@ class WebScannerApp(App):
                 self.completed, self.failed, total, time.monotonic() - self._scan_start
             )
         )
-        self.query_one("#progress", Static).update("")
+        self.query_one("#progress", Static).update(f"v{__version__}")
+        self._maybe_announce_update()
 
     # ---- progress line ----------------------------------------------------
 

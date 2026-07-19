@@ -2,6 +2,9 @@
 
 GREEN = "green"
 RED = "#FF6C64"
+#: matches the app's primary theme blue ($primary, textual-dark) — progress bar,
+#: selected-tab chip, keybar hints.
+BLUE = "#0178D4"
 #: muted value/secondary text — matches the unselected-tab colour
 #: ($text-muted = white @ 60% over the dark theme bg).
 MUTED = "#9D9D9D"
