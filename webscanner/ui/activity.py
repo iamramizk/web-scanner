@@ -30,7 +30,7 @@ from rich.markup import escape
 from ..colors import BLUE, GREEN, RED
 from ..core.context import ScanContext
 from ..core.models import ModuleResult, ModuleStatus, ScanEvent
-from ..core.scanner import PREFETCH
+from ..core.scanner import PREFETCH, SHARED_IP
 from ..net.agents import Profile
 from ..modules import all_modules
 from ..modules.dns import RECORD_TYPES, assess_spoofing
@@ -380,6 +380,9 @@ def summarize(event: ScanEvent, ctx: ScanContext | None) -> str | None:
     if event.name == PREFETCH:
         # Prefetch events never carry a result — the numbers live on the context.
         return _prefetch(ctx) if event.status is ModuleStatus.DONE else None
+    if event.name == SHARED_IP:
+        # Panel-only signal (see app.py); it isn't a module and gets no log line.
+        return None
     if event.status is ModuleStatus.RUNNING:
         return None
 

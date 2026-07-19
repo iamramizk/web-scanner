@@ -126,7 +126,10 @@ def _server_rows(ctx: ScanContext, cms: object = UNSET) -> Iterator[tuple[str, s
         yield "Final URL", ctx.final_url
     if ctx.redirect_status:
         yield "Redirected", ctx.redirect_status
-    yield "IP", ctx.ip or "-"
+    ip = ctx.ip or "-"
+    if ctx.ip_shared and ctx.shared_ip_count:
+        ip = f"{ip} (Shared · {ctx.shared_ip_count} sites)"
+    yield "IP", ip
     if geo:
         yield "Location", f"{geo.get('city', '-')}, {geo.get('country', '-')}"
     else:

@@ -302,7 +302,11 @@ def render_status(ctx: ScanContext, cms: object = UNSET) -> Table:
         table.add_row("Final URL", dim(ctx.final_url))
     if ctx.redirect_status:
         table.add_row("Redirected", dim(ctx.redirect_status))
-    table.add_row("IP", dim(ctx.ip or "-"))
+    ip_cell = Text(ctx.ip or "-", style=MUTED)
+    if ctx.ip_shared and ctx.shared_ip_count:
+        # Its own line under the IP, e.g. "23.185.0.4\n(Shared · 113 sites)".
+        ip_cell.append(f"\n(Shared · {ctx.shared_ip_count} sites)", style=MUTED)
+    table.add_row("IP", ip_cell)
 
     # Location: flag emoji stays in colour (not dimmed), the text is muted.
     if geo:

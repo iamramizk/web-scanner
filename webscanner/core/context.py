@@ -38,6 +38,13 @@ class ScanContext:
     geo: dict[str, Any] | None = None
     fetch_error: str | None = None
 
+    #: Whether the IP is shared by many sites (reverse-IP lookup). ``None`` until the
+    #: lookup resolves — and stays None on any error/rate-limit, so the panel shows
+    #: nothing rather than guess. ``shared_ip_count`` is the unique-domain tally shown
+    #: alongside. Filled by AsyncScanner concurrently with the modules, never prefetch.
+    ip_shared: bool | None = None
+    shared_ip_count: int | None = None
+
     @classmethod
     def from_target(cls, target: str) -> "ScanContext":
         domain, url = helpers.normalise(target)

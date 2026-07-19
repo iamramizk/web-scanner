@@ -97,6 +97,33 @@ def get_geo(ip: str) -> dict[str, Any]:
     return resp.json()
 
 
+def reverse_ip_lookup(ip: str) -> list[str] | None:
+    """Hostnames sharing ``ip``, via hackertarget.com (free, unauthenticated).
+
+    Returns the list of hostnames on the IP, or ``None`` on any failure — network
+    error, non-200, or a sentinel body (``error …`` / ``No DNS A records found`` /
+    ``API count exceeded …`` when the 50-request/day/IP quota is spent). Callers show
+    nothing rather than guess. Uses ``API_HEADERS`` (honest UA): a third-party API,
+    not a target request.
+    """
+    try:
+        resp = requests.get(
+            "https://api.hackertarget.com/reverseiplookup/",
+            params={"q": ip},
+            headers=API_HEADERS,
+            timeout=TIMEOUT,
+        )
+    except requests.exceptions.RequestException:
+        return None
+    if resp.status_code != 200:
+        return None
+    lines = [ln.strip() for ln in resp.text.splitlines() if ln.strip()]
+    # Every hostname line is space-free; every sentinel/error message contains spaces.
+    if not lines or any(" " in ln for ln in lines):
+        return None
+    return lines
+
+
 def get_tls_cert(host: str, port: int = 443) -> dict[str, Any] | None:
     """Complete a TLS handshake and return the peer certificate dict (or None)."""
     ctx = ssl.create_default_context()

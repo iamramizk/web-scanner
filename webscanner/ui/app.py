@@ -25,7 +25,7 @@ from textual.widgets import Input, LoadingIndicator, Static
 
 from .. import __version__
 from ..core import AsyncScanner, ModuleStatus, ScanContext, ScanEvent
-from ..core.scanner import PREFETCH
+from ..core.scanner import PREFETCH, SHARED_IP
 from ..modules import all_modules
 from ..net.version_check import check_for_update
 from . import activity
@@ -314,6 +314,12 @@ class WebScannerApp(App):
             if event.status is ModuleStatus.DONE and self.ctx is not None:
                 self.query_one("#map", MapPanel).set_geo(self.ctx.geo)
                 self.query_one("#status-content", StatusPanel).set_ctx(self.ctx)
+            return
+        if event.name == SHARED_IP:
+            # Not a module — a late panel-only refresh once the shared-IP lookup lands.
+            # Re-pass the tracked CMS so a completed Tech row isn't dropped back to UNSET.
+            if self.ctx is not None:
+                self.query_one("#status-content", StatusPanel).set_ctx(self.ctx, cms=self._cms)
             return
 
         self.query_one("#tabs", TabBar).set_status(event.name, event.status)
