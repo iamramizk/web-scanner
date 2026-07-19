@@ -153,6 +153,8 @@ class WebScannerApp(App):
         Binding("escape", "toggle_edit", "Edit domain", show=False),
         Binding("plus,equals_sign", "zoom_in", "Zoom map in", show=False),
         Binding("minus,underscore", "zoom_out", "Zoom map out", show=False),
+        Binding("pageup", "scroll_main_up", "Scroll up", show=False),
+        Binding("pagedown", "scroll_main_down", "Scroll down", show=False),
     ]
 
     def __init__(self, target: str | None = None) -> None:
@@ -461,6 +463,12 @@ class WebScannerApp(App):
 
     def action_zoom_out(self) -> None:
         self.query_one("#map", MapPanel).zoom_by(-1)
+
+    def action_scroll_main_up(self) -> None:
+        self.query_one("#main", VerticalScroll).scroll_page_up()
+
+    def action_scroll_main_down(self) -> None:
+        self.query_one("#main", VerticalScroll).scroll_page_down()
 
     def on_input_submitted(self, message: Input.Submitted) -> None:
         target = message.value.strip()
