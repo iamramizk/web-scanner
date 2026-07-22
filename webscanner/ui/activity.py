@@ -25,9 +25,12 @@ from __future__ import annotations
 import re
 from typing import Any, Callable
 
+from urllib.parse import urlparse
+
 from rich.markup import escape
 
 from ..colors import BLUE, GREEN, RED
+from ..net.psl import registrable_domain
 from ..core.context import ScanContext
 from ..core.models import ModuleResult, ModuleStatus, ScanEvent
 from ..core.scanner import PREFETCH, SHARED_IP
@@ -129,6 +132,20 @@ def _dns(result: ModuleResult) -> str:
     return f"{line} · {', '.join(auth)}." if auth else f"{line}."
 
 
+def _registrar_root(url: str | None) -> str:
+    """Registrar's registrable domain from its WHOIS ``registrar_url``.
+
+    ``http://www.hostinger.com`` → ``hostinger.com``. Tolerates a scheme-less
+    value (``www.hostinger.com``) — ``urlparse`` puts that in ``path``, not
+    ``netloc``, so fall back to the whole string as the host. Returns "" when
+    nothing usable (no URL, or no registrable domain resolves)."""
+    if not url:
+        return ""
+    parsed = urlparse(url.strip())
+    host = parsed.netloc or parsed.path
+    return registrable_domain(host.split("/")[0].split("@")[-1])
+
+
 def _whois(result: ModuleResult) -> str:
     data = result.data or {}
     if not data:
@@ -136,7 +153,11 @@ def _whois(result: ModuleResult) -> str:
     if (note := _note(data)) is not None:
         return f"{_DONE}. {_sentence(note)}"
     bits = []
-    if registrar := data.get("registrar"):
+    # Prefer the registrar's root domain (registrable eTLD+1 of its URL) over its
+    # legal name — "hostinger.com" reads truer than "HOSTINGER operations, UAB".
+    # Fall back to the name when there's no URL (sparse ccTLD output).
+    registrar = _registrar_root(data.get("registrar_url")) or data.get("registrar")
+    if registrar:
         # Unlabelled: the Whois prefix and the "expires" half make it obvious enough,
         # and the 10 chars "Registrar " costs are better spent on the name itself.
         bits.append(_esc(registrar))
