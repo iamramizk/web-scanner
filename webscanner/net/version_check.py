@@ -62,11 +62,17 @@ def _write_cache(latest: str) -> None:
     path.write_text(json.dumps({"latest": latest, "checked_at": time.time()}))
 
 
-def check_for_update(current: str) -> str | None:
-    """The latest PyPI version if newer than ``current``, else ``None``.
+def update_status(current: str) -> tuple[str, str | None]:
+    """The update state as ``(status, latest)``:
 
-    Silent on any failure — network, parse, or filesystem — since a broken update
-    check must never be visible as a scan problem.
+    - ``("outdated", latest)`` — a newer PyPI release exists;
+    - ``("latest", None)`` — confirmed up to date;
+    - ``("unknown", None)`` — couldn't check (network, parse, or filesystem failure).
+
+    The ``unknown`` case is kept distinct from ``latest`` on purpose: the status-bar
+    dot shows green only for a *confirmed* up-to-date check, and stays neutral (blue)
+    when the check couldn't complete — a broken update check must never look like a
+    scan problem, nor falsely claim "up to date".
     """
     try:
         latest = _cached_latest()
@@ -76,6 +82,18 @@ def check_for_update(current: str) -> str | None:
         if latest is None:
             latest = _fetch_latest()
             _write_cache(latest)
-        return latest if _parse(latest) > _parse(current) else None
     except Exception:  # noqa: BLE001
-        return None
+        return "unknown", None
+    if _parse(latest) > _parse(current):
+        return "outdated", latest
+    return "latest", None
+
+
+def check_for_update(current: str) -> str | None:
+    """The latest PyPI version if newer than ``current``, else ``None``.
+
+    Silent on any failure — network, parse, or filesystem — since a broken update
+    check must never be visible as a scan problem.
+    """
+    status, latest = update_status(current)
+    return latest if status == "outdated" else None

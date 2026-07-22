@@ -25,10 +25,11 @@ from textual.message import Message
 from textual.widgets import Input, LoadingIndicator, Static
 
 from .. import __version__
+from ..colors import BLUE, GREEN, ORANGE
 from ..core import AsyncScanner, ModuleStatus, ScanContext, ScanEvent
 from ..core.scanner import PREFETCH, SHARED_IP
 from ..modules import all_modules
-from ..net.version_check import check_for_update
+from ..net.version_check import update_status
 from . import activity
 from .export import export_csvs
 from .tables import UNSET, render_result, render_status
@@ -37,6 +38,11 @@ from .widgets import ActivityLog, MapPanel, SitemapTree, StatusPanel, TabBar, Ta
 #: width (cells) of the footer progress bar and its dim (incomplete) colour
 _BAR_WIDTH = 22
 _BAR_DIM = "grey30"
+
+#: colour of the status-bar version dot per update state (see net/version_check.py):
+#: blue until the background check answers / if it couldn't, green = up to date,
+#: orange = a newer PyPI release is available.
+_DOT_COLOURS = {"unknown": BLUE, "latest": GREEN, "outdated": ORANGE}
 
 #: below this terminal width the layout collapses to a single column (the fixed map
 #: + Server panels become tabs, activity becomes a tab) — see _apply_narrow.
@@ -160,10 +166,14 @@ class ScanFinished(Message):
 
 
 class VersionChecked(Message):
-    """Result of the background PyPI update check (see net/version_check.py)."""
+    """Result of the background PyPI update check (see net/version_check.py).
 
-    def __init__(self, latest: str | None) -> None:
-        self.latest = latest
+    ``status`` is one of ``"unknown"`` / ``"latest"`` / ``"outdated"`` — it drives
+    the colour of the status-bar version dot.
+    """
+
+    def __init__(self, status: str) -> None:
+        self.status = status
         super().__init__()
 
 
@@ -226,11 +236,9 @@ class WebScannerApp(App):
         # last result rendered into the sitemap Tree, so switching tabs doesn't
         # rebuild (and re-collapse) it every visit.
         self._tree_result = None
-        # background PyPI update check (see _check_version) — announced once, after
-        # whichever finishes last: the scan or the check itself.
-        self._update_available: str | None = None
-        self._version_checked = False
-        self._update_announced = False
+        # background PyPI update check (see _check_version) — drives the colour of the
+        # status-bar version dot. "unknown" (blue) until the check answers.
+        self._version_status = "unknown"
 
     # ---- layout -----------------------------------------------------------
 
@@ -260,6 +268,9 @@ class WebScannerApp(App):
         self.query_one("#tabs", TabBar).set_selected(self.selected)
         # Establish the layout (wide vs narrow) before the first paint / scan.
         self._apply_narrow(self.size.width < _NARROW_MAX)
+        # Show the version + (blue) update dot straight away; the dot recolours once
+        # the background check answers, and the progress bar reclaims the slot mid-scan.
+        self._refresh_version()
         # own group: the scan worker below is exclusive=True, which cancels every
         # other worker in its group — a shared/default group would kill this one.
         self.run_worker(
@@ -302,26 +313,20 @@ class WebScannerApp(App):
         self._set_keybar(editing=editing)
 
     async def _check_version(self) -> None:
-        latest = await asyncio.to_thread(check_for_update, __version__)
-        self.post_message(VersionChecked(latest))
+        status, _latest = await asyncio.to_thread(update_status, __version__)
+        self.post_message(VersionChecked(status))
 
     def on_version_checked(self, message: VersionChecked) -> None:
-        self._update_available = message.latest
-        self._version_checked = True
-        self._maybe_announce_update()
+        self._version_status = message.status
+        self._refresh_version()
 
-    def _maybe_announce_update(self) -> None:
-        if (
-            self._update_announced
-            or self._scanning
-            or not self._version_checked
-            or self._update_available is None
-        ):
+    def _refresh_version(self) -> None:
+        """Draw the version + update dot at the right of the footer, unless a scan is
+        in progress (then the progress bar owns that slot — restored on finish)."""
+        if self._scanning:
             return
-        self._update_announced = True
-        self.query_one("#activity", ActivityLog).add(
-            activity.update_available(self._update_available)
-        )
+        dot = _DOT_COLOURS.get(self._version_status, BLUE)
+        self.query_one("#progress", Static).update(f"v{__version__} [{dot}]•[/]")
 
     # ---- scanning ---------------------------------------------------------
 
@@ -429,8 +434,7 @@ class WebScannerApp(App):
                 self.completed, self.failed, total, time.monotonic() - self._scan_start
             )
         )
-        self.query_one("#progress", Static).update(f"v{__version__}")
-        self._maybe_announce_update()
+        self._refresh_version()
 
     # ---- progress line ----------------------------------------------------
 
