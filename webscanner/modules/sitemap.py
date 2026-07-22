@@ -37,6 +37,32 @@ MAX_URLS = 10000
 #: how deep a chain of nested <sitemapindex> files we follow
 MAX_DEPTH = 6
 
+#: File extensions that mark a sitemap ``<loc>`` as a downloadable **asset**
+#: (image / media / document / archive / static file) rather than a page.
+#: Classification is *pure parsing* — read off the URL path, never fetched.
+#: Anything not listed here (no extension, ``.html``/``.php``, a dynamic route,
+#: a trailing slash) counts as a page, so the bias is toward "page" and odd
+#: dynamic URLs aren't mislabelled.
+ASSET_EXTENSIONS = frozenset({
+    # images
+    "jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "ico",
+    "tif", "tiff", "avif", "heic", "heif",
+    # audio / video
+    "mp3", "mp4", "wav", "ogg", "oga", "webm", "mov", "avi", "mkv",
+    "flv", "m4a", "m4v", "wmv", "aac", "flac",
+    # documents
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods",
+    "odp", "rtf", "csv", "tsv", "epub",
+    # archives
+    "zip", "gz", "tgz", "tar", "rar", "7z", "bz2", "xz",
+    # web / static assets
+    "css", "js", "mjs", "map", "wasm", "rss", "atom",
+    # fonts
+    "woff", "woff2", "ttf", "otf", "eot",
+    # binaries / packages
+    "dmg", "exe", "apk", "pkg", "iso", "bin", "deb", "rpm", "msi",
+})
+
 
 class SitemapModule(ScanModule):
     name = "sitemap"
@@ -158,6 +184,17 @@ def _localname(tag: str) -> str:
     return tag.rsplit("}", 1)[-1].lower()
 
 
+def _is_asset(url: str) -> bool:
+    """True if `url`'s path names a downloadable asset (by file extension) rather
+    than a page. Pure parsing — no request is ever made. The extension is taken
+    from the last path segment only (query/fragment ignored); a missing or
+    unknown extension, or a trailing slash, counts as a page."""
+    last = urlparse(url).path.rsplit("/", 1)[-1]
+    if "." not in last:
+        return False
+    return last.rsplit(".", 1)[-1].lower() in ASSET_EXTENSIONS
+
+
 def _segments(url: str, include_host: bool) -> list[str]:
     """Path segments for `url` as tree labels: ``/blog``, ``/post`` … An empty path
     (the homepage) yields ``[]`` — it *is* the ``/`` root, not a child of it. When
@@ -196,6 +233,8 @@ def _url_tree(urls: list[str], truncated: bool) -> TreeNode:
     if truncated:
         root.children.append(TreeNode(label=f"… (truncated at {MAX_URLS} URLs)"))
     root.total = len(urls)
+    root.assets = sum(1 for u in urls if _is_asset(u))
+    root.pages = root.total - root.assets
     _sort_tree(root)
     return root
 

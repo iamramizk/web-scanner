@@ -237,7 +237,12 @@ def _sitemap(result: ModuleResult) -> str:
         return f"{_DONE}. No sitemap found."
     total = root.total or 0
     suffix = " (truncated)" if total >= MAX_URLS else ""
-    return f"{_DONE}. {_plural(total, 'URL')} found{suffix}."
+    assets = root.assets or 0
+    pages = root.pages if root.pages is not None else total
+    tally = _plural(pages, "page")
+    if assets:
+        tally += f", {_plural(assets, 'asset')}"
+    return f"{_DONE}. {tally} found{suffix}."
 
 
 def _links(result: ModuleResult) -> str:

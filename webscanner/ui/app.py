@@ -133,6 +133,20 @@ def _detect_cms(tech_data: object, html: str | None) -> tuple[str, str | None] |
     return tech
 
 
+def _sitemap_subtitle(root: object) -> str:
+    """The Sitemap tab's ``#main`` subtitle: ``"12 pages • 3 assets"`` (pages vs.
+    assets split purely by URL extension — see ``sitemap._is_asset``). Assets are
+    only shown when present; falls back to the raw total if the split is missing."""
+    pages = getattr(root, "pages", None)
+    assets = getattr(root, "assets", None) or 0
+    if pages is None:  # older/other tree without the split — show the plain count
+        return f"{getattr(root, 'total', 0) or 0} Total"
+    parts = [f"{pages} {'page' if pages == 1 else 'pages'}"]
+    if assets:
+        parts.append(f"{assets} {'asset' if assets == 1 else 'assets'}")
+    return " • ".join(parts)
+
+
 class ScanProgress(Message):
     """A ScanEvent surfaced onto the Textual message pump."""
 
@@ -542,9 +556,8 @@ class WebScannerApp(App):
             if self._tree_result is not result:
                 tree.populate(result.data)
                 self._tree_result = result
-            total = result.data.total
-            if total is not None:
-                self.query_one("#main").border_subtitle = f"{total} Total"
+            if result.data.total is not None:
+                self.query_one("#main").border_subtitle = _sitemap_subtitle(result.data)
         elif result.status is ModuleStatus.FAILED:
             self._set_main(f"[red]failed:[/] {result.error}")
         elif result.status is ModuleStatus.EMPTY:

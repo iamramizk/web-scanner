@@ -70,13 +70,17 @@ class TreeNode:
     site's URL-path hierarchy (``/blog`` → ``/blog/post-1`` …). A node is a branch
     (expandable folder) iff it has ``children``; otherwise it's a leaf (a page). The
     UI turns the root into a Textual ``Tree`` widget. ``total`` (set on the root only)
-    is the count of page URLs behind the tree, shown in the panel subtitle. ``url`` is
-    the full page URL a node stands for (set on leaves), so the UI can make it clickable.
+    is the count of URLs behind the tree, split into ``pages`` + ``assets`` (also
+    root-only), a purely parsed classification by file extension — see
+    ``sitemap._is_asset``; shown in the panel subtitle. ``url`` is the full page URL a
+    node stands for (set on leaves), so the UI can make it clickable.
     """
 
     label: str
     children: list["TreeNode"] = field(default_factory=list)
     total: int | None = None
+    pages: int | None = None
+    assets: int | None = None
     url: str | None = None
 
 
