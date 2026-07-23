@@ -705,11 +705,19 @@ class WebScannerApp(App):
     def action_zoom_out(self) -> None:
         self.query_one("#map", MapPanel).zoom_by(-1)
 
+    def _page_target(self):
+        """The widget page-up/down should scroll. Usually the main panel, but the
+        Activity pseudo-tab (narrow only) shows the #activity RichLog full-height in
+        #main's place, so page keys must scroll that instead — #main is hidden there."""
+        if self._narrow and self.selected == "activity":
+            return self.query_one("#activity", ActivityLog)
+        return self.query_one("#main", VerticalScroll)
+
     def action_scroll_main_up(self) -> None:
-        self.query_one("#main", VerticalScroll).scroll_page_up()
+        self._page_target().scroll_page_up()
 
     def action_scroll_main_down(self) -> None:
-        self.query_one("#main", VerticalScroll).scroll_page_down()
+        self._page_target().scroll_page_down()
 
     def on_input_submitted(self, message: Input.Submitted) -> None:
         target = message.value.strip()
