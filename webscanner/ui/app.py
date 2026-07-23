@@ -475,7 +475,7 @@ class WebScannerApp(App):
 
     def _update_progress(self) -> None:
         """Draw a determinate progress bar (blue = done, grey = remaining) with the
-        percentage and n/total count in white, right-aligned on the footer row."""
+        percentage in white, right-aligned on the footer row."""
         if not self._scanning:
             return
         total = len(self.modules)
@@ -484,7 +484,7 @@ class WebScannerApp(App):
         blue = self.current_theme.primary
         bar = f"[{blue}]{'━' * filled}[/][{_BAR_DIM}]{'━' * (_BAR_WIDTH - filled)}[/]"
         self.query_one("#progress", Static).update(
-            f"{bar} [white]{round(frac * 100)}% {self.completed}/{total}[/]"
+            f"{bar} [white]{round(frac * 100)}%[/]"
         )
 
     # ---- tab selection ----------------------------------------------------
