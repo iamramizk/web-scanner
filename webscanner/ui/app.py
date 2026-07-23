@@ -745,6 +745,10 @@ class WebScannerApp(App):
             # Compact set — the full labels overflow a phone-width footer.
             pairs = [("←/→", "Tab"), ("r", "Scan"), ("s", "Save"), ("q", "Quit")]
         else:
-            pairs = [("q", "Quit"), ("←/→", "Tab"), ("r", "Rescan"), ("s", "Save"), ("esc", "Edit domain")]
+            # PgUp/Dn scrolls #main — only shown wide; the narrow footer has no room.
+            pairs = [
+                ("q", "Quit"), ("←/→", "Tab"), ("Pg↑/↓", "Scroll"),
+                ("r", "Rescan"), ("s", "Save"), ("esc", "Edit domain"),
+            ]
         text = "   ".join(f"[b {c}]{k}[/] {label}" for k, label in pairs)
         self.query_one("#keybar", Static).update(text)
