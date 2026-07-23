@@ -61,19 +61,29 @@ _PSEUDO_NAMES = frozenset(name for name, _ in _PSEUDO_TABS)
 _PSEUDO_LABELS = {name: label for name, label in _PSEUDO_TABS}
 
 
+#: Wappalyzer categories that name the CMS, in priority order. ``CMS`` is the reliable
+#: signal (the broader "Content" *group* also covers non-CMS tools). ``Page builders``
+#: is a fallback for standalone site builders that carry no ``CMS`` tag (Webflow, Wix,
+#: Squarespace, Duda, Framer). It is checked *only after* ``CMS`` comes up empty, because
+#: the same category also holds WordPress *plugins* that are not the CMS (Elementor, Divi,
+#: WPBakery) — on those sites Wappalyzer tags WordPress ``CMS`` and the first pass wins.
+_CMS_CATEGORIES = ("CMS", "Page builders")
+
+
 def _cms_from_tech(data: object) -> tuple[str, str | None] | None:
     """The CMS (name, version) from the Tech result, or ``None`` if none detected.
 
     The Tech result is a ``Sections`` of per-group ``Grid``s whose rows are
-    ``[name, categories, confidence, version]`` (see ``modules/tech.py``). A CMS is
-    any tech Wappalyzer tags with the ``CMS`` category — the reliable signal (the
-    broader "Content" *group* also covers non-CMS tools). ``categories`` is a
-    ", "-joined string; version is ``"-"`` when unknown → returned as ``None``.
+    ``[name, categories, confidence, version]`` (see ``modules/tech.py``). A CMS is any
+    tech Wappalyzer tags with a category in ``_CMS_CATEGORIES`` — tried in order, so a
+    real ``CMS`` hit always beats a ``Page builders`` one across the whole result.
+    ``categories`` is a ", "-joined string; version is ``"-"`` when unknown → ``None``.
     """
-    for section in data or []:
-        for name, categories, _confidence, version in section.data:
-            if "CMS" in [c.strip() for c in str(categories).split(",")]:
-                return name, (version if version and version != "-" else None)
+    for target in _CMS_CATEGORIES:
+        for section in data or []:
+            for name, categories, _confidence, version in section.data:
+                if target in [c.strip() for c in str(categories).split(",")]:
+                    return name, (version if version and version != "-" else None)
     return None
 
 
@@ -122,12 +132,12 @@ def _same_cms(left: str, right: str) -> bool:
 def _detect_cms(tech_data: object, html: str | None) -> tuple[str, str | None] | None:
     """The CMS (name, version) for the Server panel, or ``None`` if nothing detected.
 
-    Wappalyzer's ``CMS`` category is the primary signal — it's curated, so it won't
-    mistake a page builder or analytics tag for the CMS. The ``<meta name="generator">``
-    tag covers the two cases it misses: a CMS Wappalyzer has no fingerprint for (e.g.
-    Sitefinity, Webflow) → the generator is used outright; and a CMS it detects but
-    can't version → the generator supplies the version, but only when it names the
-    *same* product, so an "Elementor 3.x" generator can't hijack a "WordPress" hit.
+    ``_cms_from_tech`` is the primary signal (Wappalyzer's ``CMS`` category, then a
+    ``Page builders`` fallback — see there). The ``<meta name="generator">`` tag covers
+    the two cases it misses: a CMS Wappalyzer has no fingerprint for at all (e.g.
+    Sitefinity) → the generator is used outright; and a CMS it detects but can't version
+    → the generator supplies the version, but only when it names the *same* product, so
+    an "Elementor 3.x" generator can't hijack a "WordPress" hit.
     """
     tech = _cms_from_tech(tech_data)
     generators = _generators(html)
