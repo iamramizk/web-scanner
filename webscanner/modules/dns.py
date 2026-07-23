@@ -151,6 +151,12 @@ class DnsModule(ScanModule):
                     out[rtype] = res
             return out
 
+        async def www_cname() -> list[str]:
+            # The apex almost never has a CNAME (forbidden alongside its SOA/NS), so
+            # the standard CNAME lookup above is usually empty. Hosting providers put
+            # the CNAME on `www.` instead — surface it when the apex has none.
+            return await asyncio.to_thread(pydig.query, f"www.{domain}", "CNAME")
+
         async def dmarc() -> list[str]:
             txt = await asyncio.to_thread(pydig.query, f"_dmarc.{domain}", "TXT")
             return [t for t in txt if "dmarc1" in t.lower()]
@@ -159,11 +165,16 @@ class DnsModule(ScanModule):
             txt = await asyncio.to_thread(pydig.query, f"{sel}._domainkey.{domain}", "TXT")
             return sel if txt and _is_dkim(txt) else None
 
-        out, dmarc_records, dkim_hits = await asyncio.gather(
+        out, www, dmarc_records, dkim_hits = await asyncio.gather(
             asyncio.to_thread(records),
+            www_cname(),
             dmarc(),
             asyncio.gather(*(dkim_selector(s) for s in DKIM_SELECTORS)),
         )
+
+        # Show the www CNAME when the apex has none (the common hosting-provider case).
+        if www and "CNAME" not in out:
+            out["CNAME (www)"] = www
 
         if dmarc_records:
             out["DMARC"] = dmarc_records
