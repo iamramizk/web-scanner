@@ -19,9 +19,7 @@ a server-status panel that stay pinned in place.
 resolvers for blocklist checks, the system `whois`, and stdlib `ssl`/`socket`. Country
 borders are embedded (Natural Earth), so even the map needs no tile service.
 
-![WebScanner — DNS tab](https://raw.githubusercontent.com/iamramizk/web-scanner/main/.github/screenshot-v2-1.png)
-
-![WebScanner — Security tab](https://raw.githubusercontent.com/iamramizk/web-scanner/main/.github/screenshot-v2-2.png)
+![WebScanner — DNS tab, with the responsive narrow layout inset](https://raw.githubusercontent.com/iamramizk/web-scanner/main/.github/screenshot-v2-2-2.png)
 
 ## Contents
 
@@ -80,7 +78,11 @@ Alongside the tabs, three fixed panels:
 - **Server** — online status and response time, the final URL after redirects, IP,
   geolocation, ISP, AS, hosting provider and detected CMS (name and version). When many
   sites share the server's IP, it flags the address as shared and counts how many distinct
-  domains resolve to it (via a free reverse-IP lookup).
+  domains resolve to it (via a free reverse-IP lookup, [hackertarget](https://hackertarget.com/),
+  rate-limited to 50 requests/day).
+
+The layout is **responsive**: on a narrow terminal it collapses to a single full-width
+column and the map, Server and Activity panels fold into their own tabs.
 
 Requests to the site being scanned wear a **coherent desktop-Chrome identity** — a real
 User-Agent plus the headers Chrome actually sends beside it — picked once per scan and
@@ -124,10 +126,18 @@ webscan example.com
 You can also run it as a module (`python -m webscanner example.com`), or from a source
 checkout without installing (`python app.py example.com`).
 
-Press `s` inside the app to save every tab to CSV. When installed, results are written to a
-`./<domain>_<timestamp>/` folder in your current directory.
+Once a scan finishes you can stay in the app: press `r` to rescan the same domain, or `esc`
+to edit the domain and scan a different one — no need to restart.
+
+Press `s` to save every tab to CSV (plus a `server.csv` for the fixed Server panel, which
+has no tab of its own). Files go into a `<domain>_<timestamp>/` folder — under `output/`
+when running from a source checkout, or straight in your current directory when installed.
 
 ## Updating
+
+The app checks PyPI in the background once a day and, when a newer release is out, marks the
+version in the footer with an orange dot and adds a line to the Activity Log — so you'll know
+when it's worth upgrading.
 
 ```bash
 pipx upgrade web-scanner
@@ -145,6 +155,8 @@ pipx install --force git+https://github.com/iamramizk/web-scanner
 | Key              | Action                                                              |
 | ---------------- | ------------------------------------------------------------------- |
 | `←` / `→` `Tab`  | Switch tabs                                                         |
+| `1`–`9` `0`      | Jump straight to the Nth tab (`0` = 10th)                           |
+| `PgUp` / `PgDn`  | Scroll the main panel up / down                                     |
 | `+` / `-`        | Zoom the country map in / out                                       |
 | `↑` / `↓` `enter`| Navigate the Sitemap tree (`space` expands/collapses all)          |
 | `r`              | Rescan                                                              |
