@@ -25,7 +25,7 @@ from textual.message import Message
 from textual.widgets import Input, LoadingIndicator, Static
 
 from .. import __version__
-from ..colors import BLUE, ORANGE
+from ..colors import ORANGE
 from ..core import AsyncScanner, ModuleStatus, ScanContext, ScanEvent
 from ..core.scanner import PREFETCH, SHARED_IP
 from ..modules import all_modules
@@ -39,15 +39,10 @@ from .widgets import ActivityLog, MapPanel, SitemapTree, StatusPanel, TabBar, Ta
 _BAR_WIDTH = 22
 _BAR_DIM = "grey30"
 
-#: colour of the status-bar version dot per update state (see net/version_check.py):
-#: blue until the background check answers / if it couldn't, green = up to date,
-#: orange = a newer PyPI release is available.
-#: "latest" uses ``ansi_green`` (not ``colors.GREEN``) so the dot matches the Server
-#: panel's ``[green]● online[/]`` exactly: that panel is a Rich renderable, whose
-#: "green" is ANSI-indexed and follows the app theme (#98a84b), whereas a plain
-#: "green" in this Static's Textual markup would resolve to truecolor #008000 — a
-#: visibly different green. ``ansi_green`` renders the dot through the same palette.
-_DOT_COLOURS = {"unknown": BLUE, "latest": "ansi_green", "outdated": ORANGE}
+#: The status-bar version dot is shown only when a newer PyPI release is available
+#: (`_version_status == "outdated"`; see net/version_check.py) — an orange `•`. The
+#: initial/unknown and up-to-date states show no dot, keeping the footer quiet until
+#: there's something to say.
 
 #: below this terminal width the layout collapses to a single column (the fixed map
 #: + Server panels become tabs, activity becomes a tab) — see _apply_narrow.
@@ -369,8 +364,10 @@ class WebScannerApp(App):
         in progress (then the progress bar owns that slot — restored on finish)."""
         if self._scanning:
             return
-        dot = _DOT_COLOURS.get(self._version_status, BLUE)
-        self.query_one("#progress", Static).update(f"v{__version__} [{dot}]•[/]")
+        # Only show the dot when an update is available (hide the initial blue /
+        # up-to-date green states) — a quiet footer until there's something to say.
+        dot = f" [{ORANGE}]•[/]" if self._version_status == "outdated" else ""
+        self.query_one("#progress", Static).update(f"v{__version__}{dot}")
 
     # ---- scanning ---------------------------------------------------------
 
