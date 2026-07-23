@@ -37,8 +37,9 @@ TAB_HEADERS: dict[str, tuple[str, str]] = {
 MAX_KEY_WIDTH = 34
 
 # Tabs whose key column is smart-cased (Title Case, acronyms kept upper) instead of
-# ALL CAPS. dns stays "upper" — its keys are record types (AAAA/CNAME/DNSKEY/DMARC).
-_SMART_LABEL_TABS = {"whois", "ssl", "headers"}
+# ALL CAPS. dns is smart too — its keys are mostly record-type acronyms (kept upper via
+# _ACRONYMS), but derived rows read better Title-cased ("Email Spoofing", "CNAME (www)").
+_SMART_LABEL_TABS = {"dns", "whois", "ssl", "headers"}
 
 # Tokens that render upper-case rather than Title-cased. Lowercase keys. Only needs
 # the acronyms that actually appear as key tokens in the smart-cased tabs — NOT an
@@ -49,6 +50,8 @@ _ACRONYMS: frozenset[str] = frozenset({
     "id", "url", "iana", "whois", "dnssec",
     # ssl
     "cn", "san", "ssl", "tls",
+    # dns record types (keep upper on the smart-cased dns tab)
+    "a", "aaaa", "ns", "cname", "soa", "mx", "txt", "caa", "ds", "dnskey",
     # headers / general web acronyms
     "xss", "csp", "hsts", "cors", "www", "ua", "md5", "ip", "dns",
     "http", "https", "uri", "api", "spf", "dkim", "dmarc",
